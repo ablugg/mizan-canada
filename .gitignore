@@ -52,3 +52,4 @@ tsconfig.tsbuildinfo
 # Misc
 *.log
 resources/seed.db
+.env.app

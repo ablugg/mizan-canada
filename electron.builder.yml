@@ -25,7 +25,7 @@ extraResources:
     to: "icon.png"
   - from: "resources/seed.db"
     to: "seed.db"
-  - from: ".env"
+  - from: ".env.app"
     to: ".env"
   - from: "data/vector-store/"
     to: "vector-store/"
