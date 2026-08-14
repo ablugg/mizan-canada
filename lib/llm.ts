@@ -1,8 +1,23 @@
 import { Ollama } from "ollama";
+import fs from "fs";
+import path from "path";
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? "http://127.0.0.1:11434";
-export const DEFAULT_MODEL = process.env.OLLAMA_MODEL ?? "qwen2.5:7b";
 export const EMBEDDING_MODEL = process.env.OLLAMA_EMBEDDING_MODEL ?? "nomic-embed-text";
+
+function readSelectedModel(): string {
+  try {
+    const configPath = path.join(process.cwd(), "data", "model-config.json");
+    const raw = fs.readFileSync(configPath, "utf-8");
+    const config = JSON.parse(raw) as { model?: string };
+    if (config.model) return config.model;
+  } catch {
+    // Config file doesn't exist yet, use env/default
+  }
+  return process.env.OLLAMA_MODEL ?? "qwen2.5:7b";
+}
+
+export const DEFAULT_MODEL = readSelectedModel();
 
 export function getOllama() {
   return new Ollama({ host: OLLAMA_HOST });

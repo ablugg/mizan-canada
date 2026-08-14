@@ -9,8 +9,12 @@ import { DEFAULT_MODEL, EMBEDDING_MODEL } from "@/lib/llm";
  * - embeddingReady: the embedding model is pulled and ready
  * - vectorsReady: the LanceDB vector store exists and has data
  */
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const url = new URL(req.url);
+    const modelOverride = url.searchParams.get("model");
+    const activeModel = modelOverride || DEFAULT_MODEL;
+
     // Ensure local user exists
     let dbReady = false;
     try {
@@ -34,7 +38,7 @@ export async function GET() {
       if (res.ok) {
         const data = (await res.json()) as { models: Array<{ name: string }> };
         const names = data.models.map((m) => m.name);
-        modelReady = names.some((n) => n === DEFAULT_MODEL || n.startsWith(DEFAULT_MODEL.split(":")[0] + ":"));
+        modelReady = names.some((n) => n === activeModel || n.startsWith(activeModel.split(":")[0] + ":"));
         embeddingReady = names.some((n) => n === EMBEDDING_MODEL || n.startsWith(EMBEDDING_MODEL.split(":")[0] + ":"));
       }
     } catch (ollamaErr) {
@@ -63,7 +67,7 @@ export async function GET() {
       modelReady,
       embeddingReady,
       vectorsReady,
-      defaultModel: DEFAULT_MODEL,
+      defaultModel: activeModel,
       embeddingModel: EMBEDDING_MODEL,
     });
   } catch (topErr) {

@@ -24,6 +24,9 @@ resources/ollama/
 # Pre-built vector store (generated via npm run build:vectors)
 data/vector-store/
 
+# User model config (written during setup)
+data/model-config.json
+
 # Cloned Canadian law source repo (large, cloned during build:vectors)
 data/sources/
 

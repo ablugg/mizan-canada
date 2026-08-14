@@ -125,6 +125,19 @@ ipcMain.handle("ollama:pull-model", async (event, model: string) => {
 ipcMain.handle("app:version", () => app.getVersion());
 ipcMain.handle("app:userData", () => app.getPath("userData"));
 
+// --- IPC: Hardware detection ---
+
+ipcMain.handle("app:hardware", async () => {
+  const os = await import("os");
+  const totalRam = os.totalmem();
+  const cpus = os.cpus();
+  const cpuModel = cpus.length > 0 ? cpus[0].model : "Unknown";
+  const cpuCores = cpus.length;
+  const platform = os.platform();
+  const arch = os.arch();
+  return { totalRam, cpuModel, cpuCores, platform, arch };
+});
+
 // --- IPC: Update check ---
 
 ipcMain.handle("app:checkUpdate", async () => {

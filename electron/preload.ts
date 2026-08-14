@@ -22,5 +22,7 @@ contextBridge.exposeInMainWorld("electron", {
     userData: () => ipcRenderer.invoke("app:userData"),
     checkUpdate: (): Promise<{ hasUpdate: boolean; latest?: string; current?: string; releaseUrl?: string }> =>
       ipcRenderer.invoke("app:checkUpdate"),
+    hardware: (): Promise<{ totalRam: number; cpuModel: string; cpuCores: number; platform: string; arch: string }> =>
+      ipcRenderer.invoke("app:hardware"),
   },
 });

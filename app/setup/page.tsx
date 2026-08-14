@@ -22,6 +22,40 @@ interface ModelState {
   error?: string;
 }
 
+interface HardwareInfo {
+  totalRam: number;
+  cpuModel: string;
+  cpuCores: number;
+  platform: string;
+  arch: string;
+}
+
+interface ModelTier {
+  id: string;
+  name: string;
+  size: string;
+  ramNeeded: string;
+  description: string;
+  recommended?: boolean;
+}
+
+const MODEL_TIERS: ModelTier[] = [
+  { id: "qwen2.5:3b", name: "qwen2.5:3b", size: "~2 GB", ramNeeded: "8 GB", description: "Fastest responses, good for basic tasks" },
+  { id: "qwen2.5:7b", name: "qwen2.5:7b", size: "~4.7 GB", ramNeeded: "16 GB", description: "Best balance of speed and quality" },
+  { id: "qwen2.5:14b", name: "qwen2.5:14b", size: "~9 GB", ramNeeded: "32 GB", description: "Highest quality, slower on most hardware" },
+];
+
+function recommendModel(hw: HardwareInfo): string {
+  const ramGB = hw.totalRam / (1024 * 1024 * 1024);
+  if (ramGB >= 28) return "qwen2.5:14b";
+  if (ramGB >= 12) return "qwen2.5:7b";
+  return "qwen2.5:3b";
+}
+
+function formatRam(bytes: number): string {
+  return `${Math.round(bytes / (1024 * 1024 * 1024))} GB`;
+}
+
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -203,6 +237,11 @@ export default function SetupPage() {
   const [status, setStatus] = useState<SetupStatus | null>(null);
   const [checking, setChecking] = useState(step === "download");
   const [isLight] = useState(false);
+  const [hardware, setHardware] = useState<HardwareInfo | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("mizan-selected-model") ?? "";
+  });
 
   const activeJ: Jurisdiction = selectedJurisdictions[0] ?? "ca";
   const jc = J_CONFIG[activeJ];
@@ -213,7 +252,7 @@ export default function SetupPage() {
   const cardBg = "rgba(255,255,255,0.03)";
   const border = "rgba(255,255,255,0.06)";
 
-  const defaultModel = status?.defaultModel ?? "qwen2.5:7b";
+  const defaultModel = selectedModel || status?.defaultModel || "qwen2.5:7b";
   const embeddingModel = status?.embeddingModel ?? "nomic-embed-text";
 
   const [mainModel, setMainModel] = useState<ModelState>({
@@ -236,15 +275,53 @@ export default function SetupPage() {
       router.replace("/attorney/research");
       return;
     }
+    detectHardware();
     if (step === "download") {
       check();
     }
   }, []);
 
+  async function detectHardware() {
+    try {
+      let hw: HardwareInfo | null = null;
+      // Try Electron IPC first
+      const w = window as unknown as { electron?: { app?: { hardware?: () => Promise<HardwareInfo> } } };
+      if (w.electron?.app?.hardware) {
+        hw = await w.electron.app.hardware();
+      } else {
+        // Fallback: server-side API
+        const res = await fetch("/api/setup/hardware", { signal: AbortSignal.timeout(5000) });
+        if (res.ok) hw = await res.json();
+      }
+      if (hw) {
+        setHardware(hw);
+        if (!selectedModel) {
+          const rec = recommendModel(hw);
+          selectModel(rec);
+        }
+      }
+    } catch {
+      // Hardware detection failed, use default
+    }
+  }
+
+  function selectModel(model: string) {
+    setSelectedModel(model);
+    localStorage.setItem("mizan-selected-model", model);
+    setMainModel(s => ({ ...s, label: model }));
+    // Persist to server so llm.ts can read it
+    fetch("/api/setup/select-model", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model }),
+    }).catch(() => {});
+  }
+
   async function check() {
     setChecking(true);
     try {
-      const res = await fetch("/api/setup/status", { signal: AbortSignal.timeout(12000) });
+      const modelParam = selectedModel ? `?model=${encodeURIComponent(selectedModel)}` : "";
+      const res = await fetch(`/api/setup/status${modelParam}`, { signal: AbortSignal.timeout(12000) });
       const data: SetupStatus = await res.json();
       setStatus(data);
 
@@ -552,6 +629,111 @@ export default function SetupPage() {
             </p>
           </div>
 
+          {/* Hardware detection + model recommendation */}
+          {hardware && (
+            <div style={{
+              background: "rgba(255,255,255,0.02)",
+              border: `1px solid rgba(255,255,255,0.06)`,
+              borderRadius: "10px",
+              padding: "14px 16px",
+              display: "flex", flexDirection: "column", gap: "10px",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <rect x="2" y="4" width="10" height="7" rx="1.5" stroke={gold} strokeWidth="1.2" />
+                  <path d="M5 4V2.5A1.5 1.5 0 0 1 6.5 1h1A1.5 1.5 0 0 1 9 2.5V4" stroke={gold} strokeWidth="1.2" />
+                  <line x1="4.5" y1="7" x2="4.5" y2="9" stroke={gold} strokeWidth="1" strokeLinecap="round" />
+                  <line x1="7" y1="7" x2="7" y2="9" stroke={gold} strokeWidth="1" strokeLinecap="round" />
+                  <line x1="9.5" y1="7" x2="9.5" y2="9" stroke={gold} strokeWidth="1" strokeLinecap="round" />
+                </svg>
+                <span style={{ fontSize: "11px", color: textMain, fontFamily: "var(--font-dm-sans)", fontWeight: 500 }}>
+                  Your hardware
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "10px", color: textMuted, fontFamily: "var(--font-dm-sans)" }}>
+                  RAM: {formatRam(hardware.totalRam)}
+                </span>
+                <span style={{ fontSize: "10px", color: textMuted, fontFamily: "var(--font-dm-sans)" }}>
+                  CPU: {hardware.cpuModel.replace(/\s+/g, " ").trim()}
+                </span>
+                <span style={{ fontSize: "10px", color: textMuted, fontFamily: "var(--font-dm-sans)" }}>
+                  Cores: {hardware.cpuCores}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Model tier selection */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <p style={{ margin: 0, fontSize: "12px", color: textMain, fontWeight: 500, fontFamily: "var(--font-dm-sans)" }}>
+              Choose AI model
+            </p>
+            <p style={{ margin: 0, fontSize: "11px", color: textMuted, lineHeight: "1.5", fontFamily: "var(--font-dm-sans)" }}>
+              {hardware
+                ? "Based on your hardware, we recommend the highlighted model. You can pick a different one."
+                : "Select the model that matches your available RAM."}
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "4px" }}>
+              {MODEL_TIERS.map((tier) => {
+                const isRecommended = hardware ? recommendModel(hardware) === tier.id : false;
+                const isSelected = defaultModel === tier.id;
+                return (
+                  <div
+                    key={tier.id}
+                    onClick={() => {
+                      if (mainModel.status === "pulling" || mainModel.status === "done") return;
+                      selectModel(tier.id);
+                    }}
+                    style={{
+                      padding: "12px 14px", borderRadius: "8px", cursor: mainModel.status === "pulling" || mainModel.status === "done" ? "default" : "pointer",
+                      border: isSelected
+                        ? `1px solid ${gold}80`
+                        : "1px solid rgba(255,255,255,0.06)",
+                      background: isSelected
+                        ? `${gold}0d`
+                        : "rgba(255,255,255,0.02)",
+                      transition: "all 0.15s",
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      opacity: mainModel.status === "pulling" || mainModel.status === "done" ? 0.5 : 1,
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "12px", color: isSelected ? gold : textMain, fontFamily: "var(--font-dm-sans)", fontWeight: 500 }}>
+                          {tier.name}
+                        </span>
+                        {isRecommended && (
+                          <span style={{
+                            fontSize: "9px", color: gold, fontFamily: "var(--font-dm-sans)",
+                            padding: "1px 6px", borderRadius: "4px",
+                            background: `${gold}15`, border: `1px solid ${gold}30`,
+                            letterSpacing: "0.06em", textTransform: "uppercase",
+                          }}>
+                            Recommended
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: "10px", color: textMuted, fontFamily: "var(--font-dm-sans)" }}>
+                        {tier.size} | Needs {tier.ramNeeded}+ RAM | {tier.description}
+                      </span>
+                    </div>
+                    <div style={{
+                      width: "14px", height: "14px", borderRadius: "50%",
+                      border: isSelected ? `2px solid ${gold}` : "1.5px solid rgba(255,255,255,0.15)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0,
+                    }}>
+                      {isSelected && (
+                        <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: gold }} />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* DB status row */}
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <div style={{
@@ -567,7 +749,7 @@ export default function SetupPage() {
           {/* Model cards */}
           <ModelCard
             name={defaultModel}
-            size="~4.7 GB  |  Main language model"
+            size={`${MODEL_TIERS.find(t => t.id === defaultModel)?.size ?? "~4.7 GB"}  |  Main language model`}
             state={mainModel}
             onDownload={downloadMainModel}
             isLight={isLight}
