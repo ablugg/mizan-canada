@@ -1,8 +1,8 @@
-# Mizan — ميزان
+# Mizan Canada
 
-**A fully local, privacy-first AI legal assistant for Saudi Arabian law.**
+**A fully local, privacy-first AI legal assistant for Canadian law.**
 
-Mizan is a free, open-source desktop application for licensed Saudi attorneys. All AI inference runs on your machine via [Ollama](https://ollama.com). Your documents, queries, and client matters never leave your device. Zero bytes sent.
+Mizan Canada is a free, open-source desktop application for licensed Canadian lawyers and notaries. All AI inference runs on your machine via [Ollama](https://ollama.com). Your documents, queries, and client matters never leave your device. Zero bytes sent.
 
 ---
 
@@ -12,12 +12,12 @@ Mizan is a free, open-source desktop application for licensed Saudi attorneys. A
 
 | Tool | Description |
 |---|---|
-| Legal Research | Multi-turn Q&A grounded in ingested Saudi statutes with article-level citations |
+| Legal Research | Multi-turn Q&A grounded in ingested Canadian statutes with section-level citations |
 | Document Review | Structured analysis of contracts and filings: risks, missing clauses, favorability score |
-| Draft Generator | Saudi-compliant document drafts from structured inputs |
-| Contract Redlining | Inline clause-level redline suggestions against Saudi law |
-| Legal Translation | Arabic to English and English to Arabic using MOJ-verified terminology |
-| Clause Playbook | Standard clause positions for common Saudi contract types |
+| Draft Generator | Canadian-compliant document drafts from structured inputs |
+| Contract Redlining | Inline clause-level redline suggestions against Canadian law |
+| Legal Translation | French to English and English to French using official bilingual terminology |
+| Clause Playbook | Standard clause positions for common Canadian contract types |
 | Deadline Extractor | Extracts every obligation and notice period from contract text |
 | Law Library | Upload your own statutes and sync pre-ingested laws |
 | Activity Monitor | Full audit log of sessions, tool usage, and security events |
@@ -53,8 +53,8 @@ ollama pull nomic-embed-text
 ### 2. Clone and install dependencies
 
 ```bash
-git clone https://github.com/ablugg/mizan.git
-cd mizan
+git clone https://github.com/ablugg/mizan-canada.git
+cd mizan-canada
 npm install
 ```
 
@@ -70,14 +70,11 @@ Edit `.env`:
 # Required
 DATABASE_URL="file:./prisma/dev.db"
 
-# Optional — defaults shown
+# Optional (defaults shown)
 OLLAMA_HOST=http://127.0.0.1:11434
 OLLAMA_MODEL=qwen2.5:7b
 OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 VECTOR_DB_PATH=./data/vector-store
-
-# Law sync — set to the GitHub repo hosting law releases
-GITHUB_LAWS_REPO=ablugg/mizan-laws
 ```
 
 ### 4. Set up the database
@@ -86,13 +83,13 @@ GITHUB_LAWS_REPO=ablugg/mizan-laws
 npm run db:push
 ```
 
-### 5. Build the pre-ingested law vector store
+### 5. Build the Canadian law vector store
 
 ```bash
 npm run build:vectors
 ```
 
-This ingests the bundled Saudi statutes into LanceDB. Run once. Re-run whenever you update the source files in `data/laws/`.
+This clones the [Justice Canada laws-lois-xml](https://github.com/justicecanada/laws-lois-xml) repo and ingests all federal Acts and Regulations (English and French) into LanceDB. Run once. Re-run to pull the latest amendments.
 
 ### 6. Run
 
@@ -117,21 +114,7 @@ The DMG (macOS) or installer will appear in `dist-electron/`.
 
 ## Law Library
 
-Attorneys can upload their own statutes directly from the app under **Law Library**. Uploaded files are chunked and embedded locally into a separate `user_chunks` table in LanceDB. They are never touched by law sync operations and persist independently.
-
-### Syncing pre-ingested laws
-
-The Law Library tab includes a **Sync Laws** button. It downloads the latest `legal_chunks.lance.zip` from GitHub Releases on the configured `GITHUB_LAWS_REPO`, replaces the local vector store, and resets the LanceDB connection. No reinstall required.
-
-### Publishing law updates (maintainers only)
-
-If you are running the admin panel (`MIZAN_ADMIN=true`), the admin page includes a **Sync Laws** button that:
-
-1. Rebuilds the vector store from `data/laws/`
-2. Zips `legal_chunks.lance`
-3. Creates a new GitHub Release and uploads the zip as an asset
-
-Attorneys then sync with one click.
+Lawyers can upload their own statutes directly from the app under **Law Library**. Uploaded files are chunked and embedded locally into a separate `user_chunks` table in LanceDB. They persist independently and are never affected by law sync operations.
 
 ---
 
@@ -139,20 +122,20 @@ Attorneys then sync with one click.
 
 ```
 Electron shell
-    │
-    └── Next.js app (standalone)
-            │
-            ├── /attorney/*         Attorney workspace (9 tools)
-            │       │
-            │       ├── lib/rag.ts              LanceDB vector retrieval
-            │       │     ├── legal_chunks      Pre-ingested Saudi statutes
-            │       │     └── user_chunks       Attorney-uploaded laws
-            │       │
-            │       └── lib/claude.ts           Ollama chat + streaming
-            │
-            ├── /chat/*             General legal chat
-            │
-            └── /api/*              API routes (all server-side, local only)
+    |
+    +-- Next.js app (standalone)
+            |
+            +-- /attorney/*         Attorney workspace (9 tools)
+            |       |
+            |       +-- lib/rag.ts              LanceDB vector retrieval
+            |       |     +-- legal_chunks      Pre-ingested Canadian statutes
+            |       |     +-- user_chunks       Lawyer-uploaded laws
+            |       |
+            |       +-- lib/llm.ts              Ollama chat + streaming
+            |
+            +-- /chat/*             General legal chat
+            |
+            +-- /api/*              API routes (all server-side, local only)
 
 All AI inference: Ollama at 127.0.0.1:11434
 Database: SQLite via Prisma (local file)
@@ -181,19 +164,17 @@ Vector store: LanceDB (local directory)
 ```
 app/
   (attorney)/attorney/*    Attorney workspace pages (9 tools)
-  (admin)/admin/           Admin panel (MIZAN_ADMIN=true only)
   api/attorney/*           Attorney API routes
-  api/admin/*              Admin API routes
   chat/[id]                General chat
 components/
   attorney/                Attorney UI components
 lib/
-  claude.ts                Ollama wrapper, system prompts
+  llm.ts                   Ollama wrapper, system prompts
   rag.ts                   LanceDB retrieval, addUserLaw, deleteUserLawChunks
   db.ts                    Prisma client
   local-auth.ts            Local session auth
 data/
-  laws/                    Saudi statute source files (.txt)
+  sources/                 Cloned Canadian law XML repo (gitignored)
   ingestion/               Vector build pipeline
 prisma/
   schema.prisma            SQLite schema
@@ -204,16 +185,19 @@ electron/                  Electron main process
 
 ## Law Coverage
 
-Pre-ingested statutes:
+The vector store is built from the official [Justice Canada Consolidated Laws](https://github.com/justicecanada/laws-lois-xml) repository, which includes:
 
-- Saudi Labour Law (Royal Decree M/51)
-- Civil Transactions Law (Royal Decree M/191)
-- Criminal Procedure Code (Royal Decree M/39)
-- Personal Data Protection Law (PDPL)
-- Commercial Court Law (Royal Decree M/93)
-- MOJ Legal Dictionary (695 Arabic-English term pairs)
+- 967 federal Acts (English and French)
+- 3,000+ federal Regulations (English and French)
+- Criminal Code (R.S.C. 1985, c. C-46)
+- Canada Labour Code (R.S.C. 1985, c. L-2)
+- Income Tax Act (R.S.C. 1985, c. 1 (5th Supp.))
+- Canada Business Corporations Act (R.S.C. 1985, c. C-44)
+- PIPEDA (S.C. 2000, c. 5)
+- Canadian Charter of Rights and Freedoms
+- And every other federal statute and regulation in force
 
-Additional statutes can be added to `data/laws/` and rebuilt with `npm run build:vectors`, or uploaded directly through the Law Library tool in the app.
+Additional statutes (including provincial laws) can be uploaded directly through the Law Library tool in the app.
 
 ---
 
@@ -223,9 +207,9 @@ Pull requests are welcome. For significant changes, open an issue first to discu
 
 Areas where contributions are particularly useful:
 
-- Additional Saudi statutes and regulations in `data/laws/`
+- Provincial statute ingestion pipelines
 - Windows and Linux packaging and testing
-- Arabic UI improvements
+- French UI improvements
 - Additional legal tool types
 
 ---
@@ -233,9 +217,3 @@ Areas where contributions are particularly useful:
 ## License
 
 MIT. See [LICENSE](./LICENSE).
-
----
-
-## Support
-
-Mizan is free for Saudi attorneys. If you find it useful, you can support development through [GitHub Sponsors](https://github.com/sponsors/ablugg). Entirely optional.
