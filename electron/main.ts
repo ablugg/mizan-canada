@@ -29,7 +29,7 @@ function createWindow(port: number) {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
-    title: "Mizan",
+    title: "Mizan Canada",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -45,8 +45,6 @@ function createWindow(port: number) {
 
   mainWindow.once("ready-to-show", () => {
     mainWindow?.show();
-    // Always open DevTools so startup errors are visible
-    mainWindow?.webContents.openDevTools();
   });
 
   // If the page fails to load, retry after a short delay
@@ -126,3 +124,22 @@ ipcMain.handle("ollama:pull-model", async (event, model: string) => {
 
 ipcMain.handle("app:version", () => app.getVersion());
 ipcMain.handle("app:userData", () => app.getPath("userData"));
+
+// --- IPC: Update check ---
+
+ipcMain.handle("app:checkUpdate", async () => {
+  try {
+    const res = await fetch(
+      "https://api.github.com/repos/ablugg/mizan-desktop/releases/latest",
+      { headers: { "User-Agent": "Mizan-Desktop" }, signal: AbortSignal.timeout(8000) }
+    );
+    if (!res.ok) return { hasUpdate: false };
+    const data = await res.json() as { tag_name?: string };
+    const latest = (data.tag_name ?? "").replace(/^v/, "");
+    const current = app.getVersion();
+    const hasUpdate = latest !== "" && latest !== current;
+    return { hasUpdate, latest, current, releaseUrl: `https://github.com/ablugg/mizan-desktop/releases/latest` };
+  } catch {
+    return { hasUpdate: false };
+  }
+});

@@ -54,6 +54,8 @@ export function ResearchProvider({ children }: { children: React.ReactNode }) {
         .filter((m) => m.id !== aiId)
         .map((m) => ({ role: m.role, content: m.content }));
 
+      const frenchMode = typeof window !== "undefined" && localStorage.getItem("mizan-locale") === "fr";
+
       const response = await fetch("/api/chat", {
         method: "POST",
         credentials: "include",
@@ -61,6 +63,7 @@ export function ResearchProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({
           conversationId: null,
           messages: [...history, { role: "user", content }],
+          frenchMode,
         }),
         signal: abortRef.current.signal,
       });

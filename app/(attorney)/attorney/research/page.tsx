@@ -47,6 +47,7 @@ export default function ResearchPage() {
         body: JSON.stringify({
           userQuestion: lastUser.content,
           assistantResponse: lastAssistant.content,
+          language: localStorage.getItem("mizan-locale") || "en",
         }),
       })
         .then((r) => r.json())
@@ -145,7 +146,7 @@ export default function ResearchPage() {
             Legal Research
           </h1>
           <p style={{ fontSize: "11px", color: "#ffffff", marginTop: "2px", fontFamily: "var(--font-dm-sans)" }}>
-            In-depth Q&A · Saudi &amp; GCC Law · Session saved &amp; retrievable
+            In-depth Q&A · Canadian Federal &amp; Provincial Law · Session saved &amp; retrievable
           </p>
           <p style={{ fontSize: "10px", color: "rgba(201,168,76,0.5)", marginTop: "3px", fontFamily: "var(--font-dm-sans)" }}>
             All processing is local · 0 bytes leave your device
@@ -187,10 +188,10 @@ export default function ResearchPage() {
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "center", marginTop: "24px" }}>
               {[
-                "What are the SAMA requirements for fintech licensing?",
-                "Analyse PDPL obligations for data processors",
-                "Compare Saudi and DIFC arbitration procedures",
-                "Enforceability of non-compete clauses under Saudi Labour Law",
+                "What are the OSFI requirements for fintech licensing in Canada?",
+                "Analyse PIPEDA obligations for data processors",
+                "Compare federal and provincial arbitration procedures in Canada",
+                "Enforceability of non-compete clauses under Canadian employment law",
               ].map((q) => (
                 <button key={q} onClick={() => sendMessage(q)} style={{ padding: "8px 14px", borderRadius: "20px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "#ffffff", fontSize: "11px", fontFamily: "var(--font-dm-sans)", cursor: "pointer", textAlign: "left", transition: "all 0.15s" }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(201,168,76,0.25)"; e.currentTarget.style.color = "rgba(201,168,76,0.85)"; }}

@@ -21,7 +21,7 @@ const FIELDS: Record<DraftType, { key: string; label: string; placeholder?: stri
     { key: "employerName", label: "Employer Name" },
     { key: "employeeName", label: "Employee Name" },
     { key: "jobTitle", label: "Job Title" },
-    { key: "salary", label: "Monthly Salary (SAR)" },
+    { key: "salary", label: "Annual Salary (CAD)" },
     { key: "startDate", label: "Start Date" },
     { key: "probationPeriod", label: "Probation Period", placeholder: "e.g. 90 days" },
   ],
@@ -29,9 +29,9 @@ const FIELDS: Record<DraftType, { key: string; label: string; placeholder?: stri
     { key: "landlordName", label: "Landlord Name" },
     { key: "tenantName", label: "Tenant Name" },
     { key: "propertyAddress", label: "Property Address", textarea: true },
-    { key: "monthlyRent", label: "Monthly Rent (SAR)" },
+    { key: "monthlyRent", label: "Monthly Rent (CAD)" },
     { key: "leaseTerm", label: "Lease Term", placeholder: "e.g. 12 months" },
-    { key: "securityDeposit", label: "Security Deposit (SAR)" },
+    { key: "securityDeposit", label: "Security Deposit (CAD)" },
   ],
   "Service Agreement": [
     { key: "serviceprovider", label: "Service Provider" },
@@ -50,7 +50,7 @@ const FIELDS: Record<DraftType, { key: string; label: string; placeholder?: stri
     { key: "sellerName", label: "Seller Name" },
     { key: "buyerName", label: "Buyer Name" },
     { key: "assetDescription", label: "Asset / Property Description", textarea: true },
-    { key: "purchasePrice", label: "Purchase Price (SAR)" },
+    { key: "purchasePrice", label: "Purchase Price (CAD)" },
     { key: "completionDate", label: "Completion Date" },
   ],
   "Consultancy Agreement": [
@@ -64,7 +64,7 @@ const FIELDS: Record<DraftType, { key: string; label: string; placeholder?: stri
     { key: "principalName", label: "Principal (Grantor) Name" },
     { key: "agentName", label: "Agent (Attorney-in-Fact) Name" },
     { key: "powers", label: "Scope of Powers Granted", textarea: true, placeholder: "e.g. Sign contracts, manage bank accounts, sell property…" },
-    { key: "limitations", label: "Limitations / Conditions", placeholder: "e.g. Valid for 1 year, restricted to property in Riyadh" },
+    { key: "limitations", label: "Limitations / Conditions", placeholder: "e.g. Valid for 1 year, restricted to property in Ontario" },
   ],
 };
 
@@ -76,7 +76,7 @@ export default function DraftPage() {
   const [docType, setDocType] = useState<DraftType | "">("");
   const [jurisdiction, setJurisdiction] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
-  const [docLang, setDocLang] = useState<"en" | "ar">("en");
+  const [docLang, setDocLang] = useState<"en" | "fr">("en");
   const [exporting, setExporting] = useState(false);
   const [editedContent, setEditedContent] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -192,7 +192,7 @@ export default function DraftPage() {
   }
 
   function handleRestore(data: unknown) {
-    const d = data as { content: string; docType: DraftType; jurisdiction: string; docLang: "en" | "ar"; fields: Record<string, string> };
+    const d = data as { content: string; docType: DraftType; jurisdiction: string; docLang: "en" | "fr"; fields: Record<string, string> };
     if (d?.content) {
       clearTask("DRAFT");
       setDocType(d.docType ?? "");
@@ -216,7 +216,7 @@ export default function DraftPage() {
   const displayDocType = draftTask?.docType || docType;
   const displayJurisdiction = draftTask?.jurisdiction || jurisdiction;
   const displayDocLang = draftTask?.docLang ?? docLang;
-  const isSaudiJurisdiction = jurisdiction.startsWith("Saudi Arabia") || (draftTask?.jurisdiction?.startsWith("Saudi Arabia") ?? false);
+  const isQuebecJurisdiction = jurisdiction.includes("Quebec") || (draftTask?.jurisdiction?.includes("Quebec") ?? false);
 
   const fieldDefs = docType ? FIELDS[docType] ?? [] : [];
   const canGenerate = !!docType && !!jurisdiction;
@@ -363,19 +363,17 @@ export default function DraftPage() {
               </div>
             )}
 
-            {/* Saudi-specific fields */}
-            {isSaudiJurisdiction && (
+            {/* Quebec-specific fields */}
+            {isQuebecJurisdiction && (
               <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
                 <div style={{ fontSize: "10px", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(201,168,76,0.6)", fontFamily: "var(--font-dm-sans)", marginBottom: "14px" }}>
-                  Saudi Particulars <span style={{ color: "#ffffff" }}>(optional — improves output)</span>
+                  Quebec Particulars <span style={{ color: "#ffffff" }}>(optional — improves output)</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                   {[
-                    { key: "hijriDate", label: "Hijri Date", placeholder: "e.g. 1 Muharram 1447 / 1446-07-01" },
-                    { key: "crNumber", label: "Commercial Registration No.", placeholder: "e.g. 1010123456" },
-                    { key: "nationalIdParty1", label: "National ID / Iqama — Party 1", placeholder: "Saudi ID or Iqama number" },
-                    { key: "nationalIdParty2", label: "National ID / Iqama — Party 2", placeholder: "Saudi ID or Iqama number" },
-                    { key: "municipality", label: "Municipality / City", placeholder: "e.g. Riyadh, Jeddah, Dammam" },
+                    { key: "neqNumber", label: "NEQ (Québec Enterprise Number)", placeholder: "e.g. 1234567890" },
+                    { key: "notaryInfo", label: "Notary / Notaire", placeholder: "Name of notary if applicable" },
+                    { key: "municipality", label: "Municipality / City", placeholder: "e.g. Montréal, Québec City, Laval" },
                   ].map(({ key, label, placeholder }) => (
                     <div key={key}>
                       <label style={{ display: "block", fontSize: "10px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#ffffff", fontFamily: "var(--font-dm-sans)", marginBottom: "5px" }}>{label}</label>
@@ -400,7 +398,7 @@ export default function DraftPage() {
                 Document Language
               </label>
               <div style={{ display: "flex", gap: "8px" }}>
-                {(["en", "ar"] as const).map((lang) => {
+                {(["en", "fr"] as const).map((lang) => {
                   const isActive = docLang === lang;
                   return (
                     <button
@@ -412,13 +410,13 @@ export default function DraftPage() {
                         background: isActive ? "rgba(201,168,76,0.1)" : "rgba(5,10,24,0.97)",
                         color: isActive ? "#e8c96d" : "#ffffff",
                         fontSize: "13px",
-                        fontFamily: lang === "ar" ? "var(--font-arabic), sans-serif" : "var(--font-dm-sans)",
+                        fontFamily: "var(--font-dm-sans)",
                         cursor: "pointer", transition: "all 0.15s",
                         display: "flex", alignItems: "center", justifyContent: "center", gap: "7px",
                       }}
                     >
-                      <span style={{ fontSize: "15px" }}>{lang === "en" ? "🇬🇧" : "🇸🇦"}</span>
-                      {lang === "en" ? "English" : "العربية"}
+                      <span style={{ fontSize: "15px" }}>{lang === "en" ? "🇨🇦" : "🇨🇦"}</span>
+                      {lang === "en" ? "English" : "Français"}
                       {isActive && (
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="20 6 9 17 4 12" />
@@ -428,9 +426,9 @@ export default function DraftPage() {
                   );
                 })}
               </div>
-              {docLang === "ar" && (
+              {docLang === "fr" && (
                 <p style={{ marginTop: "8px", fontSize: "10px", color: "#ffffff", fontFamily: "var(--font-dm-sans)" }}>
-                  The document and .docx export will be fully in Arabic with right-to-left formatting.
+                  The document and .docx export will be fully in French.
                 </p>
               )}
             </div>
@@ -480,17 +478,17 @@ export default function DraftPage() {
               </div>
             </div>
 
-            <div style={{ borderLeft: displayDocLang === "ar" ? "none" : "1.5px solid rgba(201,168,76,0.18)", borderRight: displayDocLang === "ar" ? "1.5px solid rgba(201,168,76,0.18)" : "none", paddingLeft: displayDocLang === "ar" ? 0 : "20px", paddingRight: displayDocLang === "ar" ? "20px" : 0 }}>
+            <div style={{ borderLeft: "1.5px solid rgba(201,168,76,0.18)", paddingLeft: "20px" }}>
               {isEditing ? (
                 <textarea
                   value={editedContent ?? rawContent}
                   onChange={(e) => setEditedContent(e.target.value)}
-                  style={{ width: "100%", minHeight: "500px", background: "rgba(5,10,24,0.6)", border: "1px solid rgba(201,168,76,0.2)", borderRadius: "8px", padding: "16px", color: "#ffffff", fontFamily: displayDocLang === "ar" ? "var(--font-arabic), sans-serif" : "var(--font-cormorant)", fontSize: displayDocLang === "ar" ? "16px" : "15px", fontWeight: 300, lineHeight: 1.9, resize: "vertical", outline: "none", direction: displayDocLang === "ar" ? "rtl" : "ltr" }}
+                  style={{ width: "100%", minHeight: "500px", background: "rgba(5,10,24,0.6)", border: "1px solid rgba(201,168,76,0.2)", borderRadius: "8px", padding: "16px", color: "#ffffff", fontFamily: "var(--font-cormorant)", fontSize: "15px", fontWeight: 300, lineHeight: 1.9, resize: "vertical", outline: "none", direction: "ltr" }}
                   onFocus={(e) => { e.target.style.borderColor = "rgba(201,168,76,0.4)"; }}
                   onBlur={(e) => { e.target.style.borderColor = "rgba(201,168,76,0.2)"; }}
                 />
               ) : (
-                <div className={displayDocLang === "ar" ? "draft-md draft-md-ar" : "draft-md"} style={{ direction: displayDocLang === "ar" ? "rtl" : "ltr" }}>
+                <div className="draft-md" style={{ direction: "ltr" }}>
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
                 </div>
               )}

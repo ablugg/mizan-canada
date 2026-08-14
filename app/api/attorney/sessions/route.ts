@@ -57,8 +57,8 @@ export async function GET(req: NextRequest) {
   const tool = req.nextUrl.searchParams.get("tool");
   const sessions = await db.attorneySession.findMany({
     where: { userId: LOCAL_USER_ID, ...(tool ? { tool } : {}) },
-    orderBy: { updatedAt: "desc" },
-    select: { id: true, tool: true, title: true, data: true, createdAt: true, updatedAt: true },
+    orderBy: [{ pinned: "desc" }, { updatedAt: "desc" }],
+    select: { id: true, tool: true, title: true, data: true, pinned: true, createdAt: true, updatedAt: true },
     take: 50,
   });
   return NextResponse.json({
@@ -67,10 +67,19 @@ export async function GET(req: NextRequest) {
       tool: s.tool,
       title: decryptTitle(s.title),
       preview: extractPreview(s.data, s.tool),
+      pinned: s.pinned,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,
     })),
   });
+}
+
+export async function PATCH(req: NextRequest) {
+  const { id, pinned } = await req.json();
+  if (!id || typeof pinned !== "boolean")
+    return NextResponse.json({ error: "Missing id or pinned" }, { status: 400 });
+  await db.attorneySession.updateMany({ where: { id, userId: LOCAL_USER_ID }, data: { pinned } });
+  return NextResponse.json({ ok: true });
 }
 
 export async function POST(req: NextRequest) {

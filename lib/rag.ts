@@ -1,5 +1,5 @@
 import path from "path";
-import { getOllama, EMBEDDING_MODEL } from "./claude";
+import { getOllama, EMBEDDING_MODEL } from "./llm";
 
 // LanceDB is loaded dynamically to avoid build-time issues in non-Electron environments
 async function getLanceDB() {
@@ -13,17 +13,16 @@ const USER_TABLE_NAME = "user_chunks";
 // Per-jurisdiction connection caches
 const connectionCaches: Record<string, unknown> = {};
 
-export function resetConnection(jurisdiction = "sa") {
+export function resetConnection(jurisdiction = "ca") {
   delete connectionCaches[jurisdiction];
 }
 
-function getDbPath(jurisdiction: string): string {
+function getDbPath(_jurisdiction: string): string {
   if (process.env.VECTOR_DB_PATH) return process.env.VECTOR_DB_PATH;
-  const suffix = jurisdiction === "uk" ? "-uk" : "";
-  return path.join(process.cwd(), `data/vector-store${suffix}`);
+  return path.join(process.cwd(), "data/vector-store");
 }
 
-async function getConnection(jurisdiction = "sa") {
+async function getConnection(jurisdiction = "ca") {
   if (connectionCaches[jurisdiction]) {
     return connectionCaches[jurisdiction] as Awaited<ReturnType<(typeof import("@lancedb/lancedb"))["connect"]>>;
   }
@@ -56,7 +55,7 @@ export interface LegalChunk {
 export async function retrieveContext(
   query: string,
   topK = 3,
-  jurisdiction = "sa"
+  jurisdiction = "ca"
 ): Promise<string> {
   const queryEmbedding = await embed(query);
   const db = await getConnection(jurisdiction);
@@ -93,7 +92,7 @@ export async function addUserLaw(doc: {
 }): Promise<number> {
   const { chunkText } = await import("../data/ingestion/build-vectors");
   const lancedb = await getLanceDB();
-  const jurisdiction = doc.jurisdiction ?? "sa";
+  const jurisdiction = doc.jurisdiction ?? "ca";
   const db = await getConnection(jurisdiction);
 
   const chunks = chunkText(doc.text);

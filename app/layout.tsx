@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans, Cormorant_Garamond, Noto_Naskh_Arabic } from "next/font/google";
+import { DM_Sans, Cormorant_Garamond } from "next/font/google";
 import { LocaleProvider } from "@/contexts/LocaleContext";
 import type { Locale } from "@/lib/i18n";
 import "./globals.css";
@@ -16,15 +16,9 @@ const cormorant = Cormorant_Garamond({
   variable: "--font-cormorant",
 });
 
-const notoArabic = Noto_Naskh_Arabic({
-  subsets: ["arabic"],
-  weight: ["400", "500"],
-  variable: "--font-arabic",
-});
-
 export const metadata: Metadata = {
   title: "Mizan — Legal Intelligence",
-  description: "AI-powered legal assistant for Saudi and Canadian law",
+  description: "AI-powered legal assistant for Canadian law",
   icons: {
     icon: "/favicon.svg",
     apple: "/favicon.svg",
@@ -41,12 +35,12 @@ export const viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // Default to Arabic for Saudi-focused desktop app; can be made configurable later
-  const locale: Locale = "ar";
-  const dir = "rtl";
+  // Default to English for Canadian desktop app
+  const locale: Locale = "en";
+  const dir = "ltr";
 
   return (
-    <html lang={locale} dir={dir} className={`${dmSans.variable} ${cormorant.variable} ${notoArabic.variable}`} suppressHydrationWarning>
+    <html lang={locale} dir={dir} className={`${dmSans.variable} ${cormorant.variable}`} suppressHydrationWarning>
       <head>
         <meta name="theme-color" content="#0d1e38" />
       </head>

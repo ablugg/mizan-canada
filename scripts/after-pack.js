@@ -50,12 +50,30 @@ exports.default = async function afterPack(context) {
     console.warn("  [after-pack] .prisma not found at", srcPrisma);
   }
 
-  // 2. Make the bundled Ollama binary executable on macOS/Linux
+  // 2. Make the bundled Ollama binary and its helpers executable on macOS/Linux
   if (electronPlatformName !== "win32") {
-    const ollamaBin = path.join(appOutDir, "resources", "ollama", "ollama");
-    if (fs.existsSync(ollamaBin)) {
-      fs.chmodSync(ollamaBin, 0o755);
-      console.log("  • set ollama binary +x");
+    // On macOS, extraResources land inside the .app bundle's Contents/Resources/
+    // On Linux, they land in [appOutDir]/resources/
+    let resourcesDir;
+    if (electronPlatformName === "darwin") {
+      const appEntry = fs.readdirSync(appOutDir).find((f) => f.endsWith(".app"));
+      resourcesDir = appEntry
+        ? path.join(appOutDir, appEntry, "Contents", "Resources")
+        : null;
+    } else {
+      resourcesDir = path.join(appOutDir, "resources");
+    }
+
+    if (resourcesDir) {
+      const ollamaDir = path.join(resourcesDir, "ollama", "mac");
+      if (fs.existsSync(ollamaDir)) {
+        for (const entry of fs.readdirSync(ollamaDir, { withFileTypes: true })) {
+          if (entry.isFile()) {
+            fs.chmodSync(path.join(ollamaDir, entry.name), 0o755);
+          }
+        }
+        console.log("  • set ollama/mac/* +x");
+      }
     }
   }
 };

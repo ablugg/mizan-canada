@@ -10,22 +10,22 @@ import type { TranslationKey } from "@/lib/i18n";
 
 const SUGGESTION_PROMPTS = [
   [
-    "Review a commercial lease agreement under Saudi law",
-    "Explain employment termination rules in Saudi Arabia",
-    "What are the steps to register a company in Saudi Arabia?",
-    "Summarize PDPL data protection obligations in Saudi Arabia",
+    "Review a commercial lease agreement under Canadian law",
+    "Explain employment termination rules in Canada",
+    "What are the steps to incorporate a company in Canada?",
+    "Summarize PIPEDA data protection obligations in Canada",
   ],
   [
-    "What are my options if a contractor breaches an agreement under Saudi law?",
-    "How do I register a trademark in Saudi Arabia?",
-    "Explain the process of transferring property ownership in Saudi Arabia",
-    "What are the legal requirements for obtaining residency in Saudi Arabia?",
+    "What are my options if a contractor breaches an agreement under Canadian law?",
+    "How do I register a trademark in Canada?",
+    "Explain the process of transferring property ownership in Canada",
+    "What are the legal requirements for obtaining permanent residency in Canada?",
   ],
   [
-    "What are the corporate governance requirements for Saudi joint-stock companies?",
-    "Summarize SAMA's key regulations for financial institutions in Saudi Arabia",
-    "What consumer protection rights exist under Saudi law?",
-    "How does commercial arbitration work in Saudi Arabia?",
+    "What are the corporate governance requirements for Canadian corporations?",
+    "Summarize OSFI's key regulations for financial institutions in Canada",
+    "What consumer protection rights exist under Canadian law?",
+    "How does commercial arbitration work in Canada?",
   ],
 ];
 

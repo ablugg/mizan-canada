@@ -127,7 +127,7 @@ export function useChat({ conversationId }: UseChatOptions) {
   }, [conversationId, router]);
 
   const sendMessage = useCallback(
-    async (content: string, files?: File[], arabicMode?: boolean) => {
+    async (content: string, files?: File[], frenchMode?: boolean) => {
       if (!content.trim() || isStreaming) return;
 
       if (!realConversationId.current) {
@@ -236,7 +236,7 @@ export function useChat({ conversationId }: UseChatOptions) {
             clientPublicKey,
             ...(documentIds.length ? { documentIds } : {}),
             ...(documentMeta.length ? { attachedFiles: documentMeta } : {}),
-            ...(arabicMode ? { arabicMode: true } : {}),
+            ...(frenchMode ? { frenchMode: true } : {}),
           }),
           signal: abortRef.current.signal,
         });

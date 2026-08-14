@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { chatWithSystem, DEADLINE_PROMPT } from "@/lib/claude";
+import { chatWithSystem, DEADLINE_PROMPT, langInstruction } from "@/lib/llm";
 import { parseDocumentBuffer } from "@/lib/parse-document";
 import { LOCAL_USER_ID } from "@/lib/local-auth";
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
+  const language = (formData.get("language") as string) || "en";
   if (!file) return NextResponse.json({ error: "Missing file" }, { status: 400 });
 
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
   }
 
   const raw = await chatWithSystem(
-    DEADLINE_PROMPT,
+    DEADLINE_PROMPT + langInstruction(language),
     `Extract all deadlines and obligations from this contract:\n\n${text.slice(0, 28000)}`
   );
 

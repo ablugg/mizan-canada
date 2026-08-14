@@ -65,6 +65,7 @@ export default function ReviewPage() {
     try {
       const fd = new FormData();
       fd.append("file", compareFile);
+      fd.append("language", localStorage.getItem("mizan-locale") || "en");
       const res = await fetch("/api/attorney/review", { method: "POST", body: fd, credentials: "include" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Analysis failed");

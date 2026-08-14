@@ -90,17 +90,20 @@ export const DRAFT_TYPES = [
 export type DraftType = (typeof DRAFT_TYPES)[number];
 
 export const JURISDICTIONS = [
-  "Saudi Arabia – Riyadh",
-  "Saudi Arabia – Jeddah",
-  "Saudi Arabia – Dammam",
-  "Saudi Arabia – General",
-  "UAE – Dubai",
-  "UAE – Abu Dhabi",
-  "UAE – General",
-  "Bahrain",
-  "Kuwait",
-  "Qatar",
-  "Oman",
+  "Canada – Federal",
+  "Canada – Ontario",
+  "Canada – Quebec",
+  "Canada – British Columbia",
+  "Canada – Alberta",
+  "Canada – Manitoba",
+  "Canada – Saskatchewan",
+  "Canada – Nova Scotia",
+  "Canada – New Brunswick",
+  "Canada – Newfoundland and Labrador",
+  "Canada – Prince Edward Island",
+  "Canada – Northwest Territories",
+  "Canada – Nunavut",
+  "Canada – Yukon",
 ] as const;
 
 export interface ClauseEntry {
@@ -120,7 +123,7 @@ export interface ClauseCheckResult {
 
 export interface TranslateResult {
   translatedText: string;
-  detectedLanguage: "ar" | "en";
+  detectedLanguage: "fr" | "en";
   glossary: { term: string; translation: string; notes?: string }[];
 }
 
@@ -161,13 +164,17 @@ export interface DeadlineEntry {
 
 export const SPECIALIZATIONS = [
   "Corporate & Commercial",
-  "Real Estate",
+  "Real Estate & Property",
   "Labour & Employment",
   "Banking & Finance",
   "Litigation & Arbitration",
   "Intellectual Property",
-  "Data Protection (PDPL)",
+  "Privacy & Data Protection",
   "Construction",
   "Family Law",
   "Criminal Law",
+  "Immigration",
+  "Environmental Law",
+  "Tax Law",
+  "Indigenous Law",
 ] as const;

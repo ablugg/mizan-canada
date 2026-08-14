@@ -172,8 +172,7 @@ function ModelCard({
 }
 
 const J_CONFIG: Record<Jurisdiction, { accent: string; accentRgb: string; flag: string; label: string; systemName: string; pageBg: string }> = {
-  sa: { accent: "#c9a84c", accentRgb: "201,168,76", flag: "🇸🇦", label: "Saudi Arabia", systemName: "Saudi & GCC Law", pageBg: "#060d1a" },
-  uk: { accent: "#3e8f62", accentRgb: "62,143,98",  flag: "🇬🇧", label: "United Kingdom", systemName: "English & Welsh Law", pageBg: "#040c07" },
+  ca: { accent: "#c9a84c", accentRgb: "201,168,76", flag: "🇨🇦", label: "Canada", systemName: "Canadian Federal & Provincial Law", pageBg: "#060d1a" },
 };
 
 export default function SetupPage() {
@@ -205,7 +204,7 @@ export default function SetupPage() {
   const [checking, setChecking] = useState(step === "download");
   const [isLight] = useState(false);
 
-  const activeJ: Jurisdiction = selectedJurisdictions[0] ?? "sa";
+  const activeJ: Jurisdiction = selectedJurisdictions[0] ?? "ca";
   const jc = J_CONFIG[activeJ];
   const bg = jc.pageBg;
   const gold = jc.accent;
@@ -369,11 +368,7 @@ export default function SetupPage() {
   const anyPulling = mainModel.status === "pulling" || embedModel.status === "pulling" || vectorSync === "syncing";
   const anyPending = mainModel.status !== "done" || embedModel.status !== "done" || vectorSync !== "done";
 
-  const lawPackLabel = selectedJurisdictions.includes("uk") && selectedJurisdictions.includes("sa")
-    ? "~14 MB  |  Saudi & GCC law + English & Welsh law"
-    : selectedJurisdictions.includes("uk")
-    ? "~7 MB  |  English & Welsh law statutes"
-    : "~7 MB  |  Saudi law statutes and regulations";
+  const lawPackLabel = "~7 MB  |  Canadian federal and provincial law statutes";
 
   // ── Jurisdiction picker ────────────────────────────────────────────────────
   if (step === "pick") {
@@ -407,8 +402,8 @@ export default function SetupPage() {
             </div>
 
             {/* Jurisdiction cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-              {(["sa", "uk"] as Jurisdiction[]).map((j) => {
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "12px" }}>
+              {(["ca"] as Jurisdiction[]).map((j) => {
                 const selected = selectedJurisdictions.includes(j);
                 const cfg = J_CONFIG[j];
                 return (
@@ -469,7 +464,7 @@ export default function SetupPage() {
                   ? J_CONFIG[selectedJurisdictions[0]].accent
                   : "rgba(255,255,255,0.06)",
                 color: selectedJurisdictions.length > 0
-                  ? (selectedJurisdictions[0] === "uk" ? "#fff" : "#060d1a")
+                  ? "#060d1a"
                   : "rgba(255,255,255,0.25)",
                 fontFamily: "var(--font-dm-sans)", fontSize: "12px",
                 fontWeight: 500, letterSpacing: "0.06em",
@@ -638,7 +633,7 @@ export default function SetupPage() {
                 borderRadius: "8px",
                 border: "none",
                 background: gold,
-                color: activeJ === "uk" ? "#fff" : "#060d1a",
+                color: "#060d1a",
                 fontFamily: "var(--font-dm-sans)", fontSize: "12px",
                 fontWeight: 500, letterSpacing: "0.06em",
                 cursor: "pointer",

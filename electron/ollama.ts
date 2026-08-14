@@ -17,13 +17,14 @@ export class OllamaManager {
 
   private getBinaryPath(): string {
     if (process.env.NODE_ENV === "development") {
-      // In dev, rely on system-installed Ollama
       return process.platform === "win32" ? "ollama.exe" : "ollama";
     }
 
-    const platform = process.platform === "win32" ? "win" : "mac";
-    const binary = process.platform === "win32" ? "ollama.exe" : "ollama";
-    return path.join(process.resourcesPath, "ollama", platform, binary);
+    if (process.platform === "win32") {
+      return path.join(process.resourcesPath, "ollama", "win", "ollama.exe");
+    }
+
+    return path.join(process.resourcesPath, "ollama", "mac", "ollama");
   }
 
   async isRunning(): Promise<boolean> {

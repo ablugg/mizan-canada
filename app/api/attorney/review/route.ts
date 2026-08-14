@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { chatWithSystem, DOCUMENT_REVIEW_PROMPT } from "@/lib/claude";
+import { chatWithSystem, DOCUMENT_REVIEW_PROMPT, langInstruction } from "@/lib/llm";
 import { parseDocumentBuffer } from "@/lib/parse-document";
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   const reviewFocus = (formData.get("reviewFocus") as string) || "general";
+  const language = (formData.get("language") as string) || "en";
 
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
 
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
       : "";
 
   const raw = await chatWithSystem(
-    DOCUMENT_REVIEW_PROMPT + focusInstruction,
+    DOCUMENT_REVIEW_PROMPT + focusInstruction + langInstruction(language),
     `Please review this document:\n\n${truncated}`
   );
 

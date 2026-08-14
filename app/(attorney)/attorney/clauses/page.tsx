@@ -166,6 +166,7 @@ export default function ClausesPage() {
       const fd = new FormData();
       fd.append("file", checkFile);
       fd.append("clauses", JSON.stringify(clauses));
+      fd.append("language", localStorage.getItem("mizan-locale") || "en");
       const res = await fetch("/api/attorney/clauses/check", { method: "POST", body: fd, credentials: "include" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Check failed");

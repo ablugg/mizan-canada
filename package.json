@@ -1,6 +1,6 @@
 {
-  "name": "mizan",
-  "version": "0.1.3",
+  "name": "mizan-canada",
+  "version": "0.1.0",
   "private": true,
   "main": "electron/dist/main.js",
   "scripts": {

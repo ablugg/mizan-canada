@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { chatWithSystem, REDLINE_PROMPT } from "@/lib/claude";
+import { chatWithSystem, REDLINE_PROMPT, langInstruction } from "@/lib/llm";
 import { parseDocumentBuffer } from "@/lib/parse-document";
 
 export async function POST(req: NextRequest) {
@@ -7,6 +7,7 @@ export async function POST(req: NextRequest) {
   const file = formData.get("file") as File | null;
   const reviewType = (formData.get("reviewType") as string) || "general risk assessment";
   const clientPosition = (formData.get("clientPosition") as string) || "neutral";
+  const language = (formData.get("language") as string) || "en";
 
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
 
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
   const contextInstruction = `\n\nReview type: ${reviewType}.\nClient position: ${clientPosition} (optimize suggestions to favor this party where applicable).`;
 
   const raw = await chatWithSystem(
-    REDLINE_PROMPT + contextInstruction,
+    REDLINE_PROMPT + contextInstruction + langInstruction(language),
     `Please redline this document:\n\n${truncated}`
   );
 

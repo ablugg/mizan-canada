@@ -209,7 +209,7 @@ export default function RedlinePage() {
                       type="text"
                       value={instruction}
                       onChange={(e) => setInstruction(e.target.value)}
-                      placeholder="e.g. This is a Saudi law contract, ignore English law references"
+                      placeholder="e.g. This is a Canadian law contract, focus on provincial requirements"
                       style={{ width: "100%", background: "rgba(5,10,24,0.97)", border: "1px solid rgba(22,58,140,0.22)", borderRadius: "8px", padding: "9px 13px", color: "#ffffff", fontSize: "12px", fontFamily: "var(--font-dm-sans)", outline: "none" }}
                       onFocus={(e) => { e.target.style.borderColor = "rgba(201,168,76,0.3)"; }}
                       onBlur={(e) => { e.target.style.borderColor = "rgba(22,58,140,0.22)"; }}

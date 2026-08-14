@@ -211,7 +211,7 @@ export default function LawsPage() {
               <input
                 value={source}
                 onChange={(e) => setSource(e.target.value)}
-                placeholder="e.g. Saudi Labour Law"
+                placeholder="e.g. Canada Labour Code"
                 disabled={status === "uploading"}
                 style={{ width: "100%", padding: "9px 12px", borderRadius: "8px", background: inputBg, border: `1px solid ${inputBorder}`, color: inputColor, fontSize: "13px", fontFamily: "var(--font-dm-sans)", outline: "none", boxSizing: "border-box" }}
               />
@@ -223,7 +223,7 @@ export default function LawsPage() {
               <input
                 value={statute}
                 onChange={(e) => setStatute(e.target.value)}
-                placeholder="e.g. Royal Decree M/51"
+                placeholder="e.g. R.S.C. 1985, c. L-2"
                 disabled={status === "uploading"}
                 style={{ width: "100%", padding: "9px 12px", borderRadius: "8px", background: inputBg, border: `1px solid ${inputBorder}`, color: inputColor, fontSize: "13px", fontFamily: "var(--font-dm-sans)", outline: "none", boxSizing: "border-box" }}
               />
@@ -241,7 +241,7 @@ export default function LawsPage() {
               style={{ padding: "9px 12px", borderRadius: "8px", background: inputBg, border: `1px solid ${inputBorder}`, color: inputColor, fontSize: "13px", fontFamily: "var(--font-dm-sans)", outline: "none", cursor: "pointer" }}
             >
               <option value="en">English</option>
-              <option value="ar">Arabic</option>
+              <option value="fr">French</option>
               <option value="both">Both</option>
             </select>
           </div>

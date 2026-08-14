@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { chatWithSystem, ATTORNEY_SYSTEM_PROMPT } from "@/lib/claude";
+import { chatWithSystem, ATTORNEY_SYSTEM_PROMPT } from "@/lib/llm";
 import type { DraftType } from "@/types";
 
-function buildDraftPrompt(docType: string, fields: Record<string, string>, docLang: "en" | "ar"): string {
+function buildDraftPrompt(docType: string, fields: Record<string, string>, docLang: "en" | "fr"): string {
   const fieldList = Object.entries(fields)
     .filter(([, v]) => v?.trim())
     .map(([k, v]) => `- ${k}: ${v}`)
     .join("\n");
 
   const langInstruction =
-    docLang === "ar"
-      ? `IMPORTANT: Write the entire document in Arabic. Use formal Arabic legal language consistent with Saudi legal practice. All headings, clauses, recitals, and signature blocks must be in Arabic.`
-      : `Write the document in English using formal legal language consistent with Saudi legal practice.`;
+    docLang === "fr"
+      ? `IMPORTANT: Write the entire document in French. Use formal French legal language consistent with Canadian legal practice (particularly Quebec civil law terminology where applicable). All headings, clauses, recitals, and signature blocks must be in French.`
+      : `Write the document in English using formal legal language consistent with Canadian legal practice.`;
 
-  return `Draft a complete, professionally formatted ${docType} under Saudi Arabian law using the following details:
+  return `Draft a complete, professionally formatted ${docType} under Canadian law using the following details:
 
 ${fieldList}
 
@@ -26,20 +26,20 @@ Requirements:
 - Include recitals/whereas clauses where appropriate
 - Add signature blocks with appropriate formality
 - Note any clauses that may need customization with [CUSTOMIZE: reason]
-- The document should be ready for attorney review and client signature`;
+- The document should be ready for lawyer review and client signature`;
 }
 
 export async function POST(req: NextRequest) {
   const { docType, fields, docLang } = (await req.json()) as {
     docType: DraftType;
     fields: Record<string, string>;
-    docLang: "en" | "ar";
+    docLang: "en" | "fr";
   };
 
   if (!docType || !fields)
     return NextResponse.json({ error: "Missing document type or fields" }, { status: 400 });
 
-  const lang: "en" | "ar" = docLang === "ar" ? "ar" : "en";
+  const lang: "en" | "fr" = docLang === "fr" ? "fr" : "en";
   const userPrompt = buildDraftPrompt(docType, fields, lang);
 
   const content = await chatWithSystem(ATTORNEY_SYSTEM_PROMPT, userPrompt);

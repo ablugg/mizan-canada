@@ -11,8 +11,8 @@ interface ChatInputProps {
   onHide?: () => void;
   isStreaming?: boolean;
   disabled?: boolean;
-  arabicMode?: boolean;
-  onArabicToggle?: (active: boolean) => void;
+  frenchMode?: boolean;
+  onFrenchToggle?: (active: boolean) => void;
 }
 
 const ACCEPTED = ".pdf,.doc,.docx,.txt";
@@ -24,7 +24,7 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function ChatInput({ onSend, onStop, onHide, isStreaming, disabled, arabicMode, onArabicToggle }: ChatInputProps) {
+export function ChatInput({ onSend, onStop, onHide, isStreaming, disabled, frenchMode, onFrenchToggle }: ChatInputProps) {
   const { t } = useLocale();
   const [value, setValue] = useState("");
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
@@ -195,17 +195,17 @@ export function ChatInput({ onSend, onStop, onHide, isStreaming, disabled, arabi
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                 <button
-                  onClick={() => onArabicToggle?.(!arabicMode)}
+                  onClick={() => onFrenchToggle?.(!frenchMode)}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] transition-all duration-150"
                   style={{
-                    border: arabicMode ? "1px solid rgba(201,168,76,0.3)" : "1px solid rgba(100,140,200,0.15)",
-                    color: arabicMode ? "var(--gold)" : "rgba(100,130,170,0.8)",
-                    background: arabicMode ? "rgba(201,168,76,0.06)" : "transparent",
+                    border: frenchMode ? "1px solid rgba(201,168,76,0.3)" : "1px solid rgba(100,140,200,0.15)",
+                    color: frenchMode ? "var(--gold)" : "rgba(100,130,170,0.8)",
+                    background: frenchMode ? "rgba(201,168,76,0.06)" : "transparent",
                     touchAction: "manipulation",
                   }}
                 >
                   <Languages size={10} />
-                  Arabic
+                  French
                 </button>
 
                 <button

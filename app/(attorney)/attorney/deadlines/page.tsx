@@ -56,6 +56,7 @@ export default function DeadlinesPage() {
     try {
       const fd = new FormData();
       fd.append("file", file);
+      fd.append("language", localStorage.getItem("mizan-locale") || "en");
       const res = await fetch("/api/attorney/deadlines", { method: "POST", credentials: "include", body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Extraction failed");

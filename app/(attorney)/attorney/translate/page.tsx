@@ -8,13 +8,13 @@ import { DocStarField } from "@/components/attorney/DocStarField";
 import { DocumentUploadZone } from "@/components/attorney/DocumentUploadZone";
 import { EnclaveProcessing } from "@/components/attorney/EnclaveProcessing";
 
-type Direction = "auto" | "ar-en" | "en-ar";
+type Direction = "auto" | "fr-en" | "en-fr";
 type InputMode = "text" | "document";
 
 const DIR_LABELS: Record<Direction, string> = {
   auto: "Auto-detect",
-  "ar-en": "Arabic → English",
-  "en-ar": "English → Arabic",
+  "fr-en": "French → English",
+  "en-fr": "English → French",
 };
 
 function highlightText(text: string, terms: Set<string>): React.ReactNode[] {
@@ -129,7 +129,7 @@ export default function TranslatePage() {
             Legal Translation
           </h1>
           <p style={{ fontSize: "11px", color: "#ffffff", marginTop: "2px", fontFamily: "var(--font-dm-sans)" }}>
-            Arabic ↔ English · Legal terminology · Key term glossary
+            French ↔ English · Legal terminology · Key term glossary
           </p>
           <p style={{ fontSize: "10px", color: "rgba(201,168,76,0.5)", marginTop: "3px", fontFamily: "var(--font-dm-sans)" }}>
             Fully local · 0 bytes leave your device
@@ -187,7 +187,7 @@ export default function TranslatePage() {
                 <>
                   <div style={{ position: "fixed", inset: 0, zIndex: 10 }} onClick={() => setShowDirMenu(false)} />
                   <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 20, background: "#0c1628", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", overflow: "hidden", minWidth: "160px" }}>
-                    {(["auto", "ar-en", "en-ar"] as Direction[]).map((d) => (
+                    {(["auto", "fr-en", "en-fr"] as Direction[]).map((d) => (
                       <button key={d} onClick={() => { setDirection(d); setShowDirMenu(false); }}
                         style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 14px", background: direction === d ? "rgba(201,168,76,0.08)" : "transparent", color: direction === d ? "#c9a84c" : "#ffffff", fontSize: "12px", fontFamily: "var(--font-dm-sans)", border: "none", cursor: "pointer" }}>
                         {DIR_LABELS[d]}
@@ -238,7 +238,7 @@ export default function TranslatePage() {
               <div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
                   <div style={{ fontSize: "9px", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(201,168,76,0.6)", fontFamily: "var(--font-dm-sans)" }}>
-                    Translation · {result.detectedLanguage === "ar" ? "Arabic → English" : "English → Arabic"}
+                    Translation · {result.detectedLanguage === "fr" ? "French → English" : "English → French"}
                   </div>
                   <div style={{ display: "flex", gap: "8px" }}>
                     <button onClick={copyTranslation}
@@ -247,7 +247,7 @@ export default function TranslatePage() {
                     </button>
                   </div>
                 </div>
-                <div style={{ background: "rgba(4,8,20,0.7)", border: "1px solid rgba(201,168,76,0.12)", borderRadius: "12px", padding: "20px 24px", color: "#ffffff", fontSize: "14px", fontFamily: "var(--font-dm-sans)", lineHeight: 1.8, whiteSpace: "pre-wrap", wordBreak: "break-word", direction: result.detectedLanguage === "en" ? "rtl" : "ltr", minHeight: "420px" }}>
+                <div style={{ background: "rgba(4,8,20,0.7)", border: "1px solid rgba(201,168,76,0.12)", borderRadius: "12px", padding: "20px 24px", color: "#ffffff", fontSize: "14px", fontFamily: "var(--font-dm-sans)", lineHeight: 1.8, whiteSpace: "pre-wrap", wordBreak: "break-word", direction: "ltr", minHeight: "420px" }}>
                   {activeTerms.size > 0 ? highlightText(result.translatedText, activeTerms) : result.translatedText}
                 </div>
               </div>
@@ -322,14 +322,14 @@ export default function TranslatePage() {
                   <div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
                       <div style={{ fontSize: "9px", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(201,168,76,0.6)", fontFamily: "var(--font-dm-sans)" }}>
-                        Translation · {result.detectedLanguage === "ar" ? "Arabic → English" : "English → Arabic"}
+                        Translation · {result.detectedLanguage === "fr" ? "French → English" : "English → French"}
                       </div>
                       <button onClick={copyTranslation}
                         style={{ display: "flex", alignItems: "center", gap: "5px", padding: "4px 10px", borderRadius: "6px", background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "#ffffff", fontSize: "11px", fontFamily: "var(--font-dm-sans)", cursor: "pointer" }}>
                         {copied ? <><Check size={10} /> Copied</> : <><Copy size={10} /> Copy</>}
                       </button>
                     </div>
-                    <div style={{ minHeight: "320px", background: "rgba(4,8,20,0.7)", border: "1px solid rgba(201,168,76,0.12)", borderRadius: "12px", padding: "16px", color: "#ffffff", fontSize: "14px", fontFamily: "var(--font-dm-sans)", lineHeight: 1.7, whiteSpace: "pre-wrap", wordBreak: "break-word", direction: result.detectedLanguage === "en" ? "rtl" : "ltr" }}>
+                    <div style={{ minHeight: "320px", background: "rgba(4,8,20,0.7)", border: "1px solid rgba(201,168,76,0.12)", borderRadius: "12px", padding: "16px", color: "#ffffff", fontSize: "14px", fontFamily: "var(--font-dm-sans)", lineHeight: 1.7, whiteSpace: "pre-wrap", wordBreak: "break-word", direction: "ltr" }}>
                       {activeTerms.size > 0 ? highlightText(result.translatedText, activeTerms) : result.translatedText}
                     </div>
                   </div>

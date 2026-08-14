@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, ensureLocalUser } from "@/lib/db";
-import { DEFAULT_MODEL, EMBEDDING_MODEL } from "@/lib/claude";
+import { DEFAULT_MODEL, EMBEDDING_MODEL } from "@/lib/llm";
 
 /**
  * Returns the current setup state:

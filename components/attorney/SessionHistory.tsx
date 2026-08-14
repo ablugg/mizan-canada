@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Clock, Trash2, RotateCcw, X, History } from "lucide-react";
+import { Clock, Trash2, RotateCcw, X, History, Bookmark, BookmarkCheck } from "lucide-react";
 
 interface SessionMeta {
   id: string;
   tool: string;
   title: string;
   preview?: string;
+  pinned: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -76,6 +77,20 @@ export function SessionHistory({ tool, onRestore, refreshTrigger }: Props) {
     setSessions((prev) => prev.filter((s) => s.id !== id));
   }
 
+  async function togglePin(id: string, currentlyPinned: boolean) {
+    const pinned = !currentlyPinned;
+    await fetch("/api/attorney/sessions", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, pinned }),
+    });
+    setSessions((prev) =>
+      prev.map((s) => s.id === id ? { ...s, pinned } : s)
+        .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
+    );
+  }
+
   const TOOL_LABELS: Record<string, string> = {
     RESEARCH: "Research",
     REVIEW: "Review",
@@ -113,7 +128,7 @@ export function SessionHistory({ tool, onRestore, refreshTrigger }: Props) {
               {TOOL_LABELS[tool]} History
             </p>
             <p style={{ fontSize: "10px", color: "rgba(140,160,190,0.55)", marginTop: "1px", fontFamily: "var(--font-dm-sans)" }}>
-              {sessions.length} saved session{sessions.length !== 1 ? "s" : ""}
+              {sessions.length} session{sessions.length !== 1 ? "s" : ""} · unsaved deleted after 7 days
             </p>
           </div>
           <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(180,190,210,0.4)", display: "flex", padding: "4px" }}>
@@ -134,7 +149,7 @@ export function SessionHistory({ tool, onRestore, refreshTrigger }: Props) {
                 No saved sessions yet
               </p>
               <p style={{ fontSize: "11px", color: "rgba(140,160,190,0.35)", marginTop: "6px", fontFamily: "var(--font-dm-sans)" }}>
-                Sessions are saved automatically when you complete a task.
+                Sessions are saved automatically. Bookmark one to keep it permanently.
               </p>
             </div>
           ) : (
@@ -169,6 +184,21 @@ export function SessionHistory({ tool, onRestore, refreshTrigger }: Props) {
                     </p>
                   </div>
                   <div style={{ display: "flex", gap: "4px", flexShrink: 0, alignItems: "center" }}>
+                    <button
+                      onClick={() => togglePin(s.id, s.pinned)}
+                      title={s.pinned ? "Remove from saved" : "Save permanently"}
+                      style={{
+                        width: "28px", height: "28px", borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center",
+                        background: s.pinned ? "rgba(201,168,76,0.15)" : "rgba(255,255,255,0.04)",
+                        border: `1px solid ${s.pinned ? "rgba(201,168,76,0.4)" : "rgba(255,255,255,0.08)"}`,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {s.pinned
+                        ? <BookmarkCheck size={11} style={{ color: "#c9a84c" }} />
+                        : <Bookmark size={11} style={{ color: "rgba(180,190,210,0.45)" }} />
+                      }
+                    </button>
                     <button
                       onClick={() => restore(s.id)}
                       disabled={restoring === s.id}

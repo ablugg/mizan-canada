@@ -72,13 +72,13 @@ const FEATURES = [
   },
   {
     icon: <DocumentIcon />,
-    title: "Saudi Law Document Review",
-    body: "Upload contracts, agreements, or legal documents for analysis grounded in Saudi law: Labour Law, PDPL, Companies Law, and more. All document content is processed locally so your client information never leaves your device.",
+    title: "Canadian Law Document Review",
+    body: "Upload contracts, agreements, or legal documents for analysis grounded in Canadian law: PIPEDA, Canada Labour Code, Canada Business Corporations Act, and more. All document content is processed locally so your client information never leaves your device.",
   },
   {
     icon: <LanguageIcon />,
-    title: "Arabic & English",
-    body: "Mizan understands and responds fluently in both Arabic and English. Simply write in whichever language you prefer and Mizan will reply in kind.\n\nNote: Arabic will be the primary interface language at launch.",
+    title: "French & English",
+    body: "Mizan understands and responds fluently in both French and English. Simply write in whichever language you prefer and Mizan will reply in kind.",
   },
 ];
 
@@ -166,7 +166,7 @@ export function WelcomeModal() {
               fontFamily: "var(--font-dm-sans)",
             }}
           >
-            Your private AI legal assistant for Saudi law — here is what makes Mizan different.
+            Your private AI legal assistant for Canadian law — here is what makes Mizan different.
           </p>
         </div>
 

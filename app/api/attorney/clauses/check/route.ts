@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { chatWithSystem, CLAUSE_CHECK_PROMPT } from "@/lib/claude";
+import { chatWithSystem, CLAUSE_CHECK_PROMPT, langInstruction } from "@/lib/llm";
 import { parseDocumentBuffer } from "@/lib/parse-document";
 import { LOCAL_USER_ID } from "@/lib/local-auth";
 import type { ClauseEntry } from "@/types";
@@ -9,6 +9,7 @@ export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   const clausesJson = formData.get("clauses") as string | null;
+  const language = (formData.get("language") as string) || "en";
 
   if (!file || !clausesJson)
     return NextResponse.json({ error: "Missing file or clauses" }, { status: 400 });
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     .join("\n\n");
 
   const raw = await chatWithSystem(
-    CLAUSE_CHECK_PROMPT,
+    CLAUSE_CHECK_PROMPT + langInstruction(language),
     `Playbook:\n\n${playbookSummary}\n\n${"─".repeat(40)}\n\nContract to check:\n\n${text.slice(0, 24000)}`
   );
 

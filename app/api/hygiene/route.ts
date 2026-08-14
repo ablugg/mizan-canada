@@ -4,7 +4,7 @@ import { db, ensureLocalUser } from "@/lib/db";
 const RETENTION_DAYS = 7;
 
 /**
- * GET -- run hygiene pass: delete unpinned conversations older than 7 days.
+ * GET -- run hygiene pass: delete unpinned conversations and attorney sessions older than 7 days.
  * Called once on app startup from the client.
  */
 export async function GET() {
@@ -13,18 +13,20 @@ export async function GET() {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
 
-  const { count } = await db.conversation.deleteMany({
-    where: {
-      pinned: false,
-      updatedAt: { lt: cutoff },
-    },
+  const { count: convCount } = await db.conversation.deleteMany({
+    where: { pinned: false, updatedAt: { lt: cutoff } },
   });
 
-  if (count > 0) {
-    console.log(`[hygiene] Deleted ${count} conversation(s) older than ${RETENTION_DAYS} days`);
-  }
+  const { count: sessionCount } = await db.attorneySession.deleteMany({
+    where: { pinned: false, updatedAt: { lt: cutoff } },
+  });
 
-  return NextResponse.json({ deleted: count });
+  if (convCount > 0)
+    console.log(`[hygiene] Deleted ${convCount} conversation(s) older than ${RETENTION_DAYS} days`);
+  if (sessionCount > 0)
+    console.log(`[hygiene] Deleted ${sessionCount} attorney session(s) older than ${RETENTION_DAYS} days`);
+
+  return NextResponse.json({ deleted: convCount + sessionCount });
 }
 
 /**

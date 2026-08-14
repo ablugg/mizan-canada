@@ -29,11 +29,10 @@ function buildLogoRun(logo: LogoData): Paragraph {
   });
 }
 
-function parseContentToDocx(content: string, title: string, logo?: LogoData, docLang: "en" | "ar" = "en"): Document {
-  const isAr = docLang === "ar";
-  const bodyFont = isAr ? "Traditional Arabic" : "Georgia";
-  const alignment = isAr ? AlignmentType.RIGHT : AlignmentType.JUSTIFIED;
-  const bidi = isAr ? true : undefined;
+function parseContentToDocx(content: string, title: string, logo?: LogoData, docLang: "en" | "fr" = "en"): Document {
+  const bodyFont = "Georgia";
+  const alignment = AlignmentType.JUSTIFIED;
+  const bidi = undefined;
 
   const children: Paragraph[] = [];
 
@@ -75,14 +74,7 @@ function parseContentToDocx(content: string, title: string, logo?: LogoData, doc
 
     prevWasBlank = false;
 
-    if (isAr) {
-      children.push(new Paragraph({
-        children: [new TextRun({ text: trimmed, size: 24, font: bodyFont, rightToLeft: true })],
-        spacing: { before: 0, after: 100 },
-        alignment,
-        bidirectional: true,
-      }));
-    } else {
+    {
       // ALL-CAPS line = section heading
       if (trimmed === trimmed.toUpperCase() && trimmed.length > 3 && trimmed.length < 80 && !/^\d/.test(trimmed)) {
         children.push(new Paragraph({
@@ -119,7 +111,7 @@ function parseContentToDocx(content: string, title: string, logo?: LogoData, doc
     styles: {
       default: {
         document: {
-          run: { font: bodyFont, size: isAr ? 24 : 22, color: "000000" },
+          run: { font: bodyFont, size: 22, color: "000000" },
           // 240 = single-spaced; 276 ≈ 115% gives comfortable but tight reading
           paragraph: { spacing: { line: 276, lineRule: "auto" } },
         },
@@ -141,7 +133,7 @@ export async function POST(req: NextRequest) {
   if (!content) return NextResponse.json({ error: "No content provided" }, { status: 400 });
 
   const documentTitle = title || docType || "Legal Document";
-  const lang: "en" | "ar" = docLang === "ar" ? "ar" : "en";
+  const lang: "en" | "fr" = docLang === "fr" ? "fr" : "en";
   const doc = parseContentToDocx(content, documentTitle, logo ?? undefined, lang);
   const buffer = await Packer.toBuffer(doc);
 

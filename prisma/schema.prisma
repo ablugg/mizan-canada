@@ -70,6 +70,7 @@ model AttorneySession {
   tool      String
   title     String
   data      String
+  pinned    Boolean      @default(false)
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 

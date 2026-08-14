@@ -282,8 +282,8 @@ export function AttorneySidebar() {
                 {isLight ? <Moon size={13} /> : <Sun size={13} />}
               </button>
               <button
-                title={locale === "ar" ? "Switch to English" : "Switch to Arabic"}
-                onClick={() => setLocale(locale === "ar" ? "en" : "ar")}
+                title={locale === "fr" ? "Switch to English" : "Switch to French"}
+                onClick={() => setLocale(locale === "fr" ? "en" : "fr")}
                 style={{ background: "transparent", border: "none", cursor: "pointer", color: tc.logoutColor, display: "flex", alignItems: "center", transition: "color 0.15s", fontSize: "9px", fontFamily: "var(--font-dm-sans)", letterSpacing: "0.1em" }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = `rgba(${accentRgb},0.7)`; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = tc.logoutColor; }}
@@ -356,14 +356,14 @@ export function AttorneySidebar() {
 
               {/* Language toggle */}
               <button
-                onClick={() => setLocale(locale === "ar" ? "en" : "ar")}
+                onClick={() => setLocale(locale === "fr" ? "en" : "fr")}
                 style={{ display: "flex", alignItems: "center", gap: "7px", width: "100%", padding: "6px 8px", borderRadius: "7px", background: "transparent", border: `1px solid ${tc.toggleBorder}`, cursor: "pointer", transition: "all 0.2s", marginTop: "6px" }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = `rgba(${accentRgb},0.3)`; e.currentTarget.style.background = `rgba(${accentRgb},0.06)`; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = tc.toggleBorder; e.currentTarget.style.background = "transparent"; }}
               >
                 <Globe size={11} style={{ color: tc.toggleColor, flexShrink: 0 }} />
                 <span style={{ fontSize: "9px", letterSpacing: "0.16em", textTransform: "uppercase", color: tc.themeLabelColor, fontFamily: "var(--font-dm-sans)", transition: "color 0.5s" }}>
-                  {locale === "ar" ? "ENGLISH" : "العربية"}
+                  {locale === "fr" ? "ENGLISH" : "FRANCAIS"}
                 </span>
               </button>
 
@@ -378,7 +378,7 @@ export function AttorneySidebar() {
               >
                 <Heart size={11} style={{ color: "rgba(224,112,112,0.5)", flexShrink: 0 }} />
                 <span style={{ fontSize: "9px", letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(224,112,112,0.45)", fontFamily: "var(--font-dm-sans)" }}>
-                  {locale === "ar" ? "ادعم ميزان" : "Support Mizan"}
+                  {locale === "fr" ? "Soutenir Mizan" : "Support Mizan"}
                 </span>
               </a>
 
@@ -397,7 +397,7 @@ export function AttorneySidebar() {
                     <path d="M1.5 9.5h8" stroke={accentColor} strokeWidth="1.4" strokeLinecap="round"/>
                   </svg>
                   <span style={{ fontSize: "9px", letterSpacing: "0.12em", textTransform: "uppercase", color: `rgba(${accentRgb},0.85)`, fontFamily: "var(--font-dm-sans)" }}>
-                    {locale === "ar" ? `تحديث ${updateInfo.latest}` : `Update v${updateInfo.latest}`}
+                    {locale === "fr" ? `Mise a jour ${updateInfo.latest}` : `Update v${updateInfo.latest}`}
                   </span>
                 </a>
               )}
@@ -406,15 +406,15 @@ export function AttorneySidebar() {
               {installedJurisdictions.length > 1 && (
                 <div style={{ display: "flex", gap: "6px", marginTop: "6px" }}>
                   {installedJurisdictions.map((j) => {
-                    const jAccent = j === "uk" ? "#3e8f62" : "#c9a84c";
-                    const jRgb = j === "uk" ? "62,143,98" : "201,168,76";
-                    const jFlag = j === "uk" ? "🇬🇧" : "🇸🇦";
+                    const jAccent = "#c9a84c";
+                    const jRgb = "201,168,76";
+                    const jFlag = "🇨🇦";
                     const isActive = j === activeJurisdiction;
                     return (
                       <button
                         key={j}
                         onClick={() => setActiveJurisdiction(j)}
-                        title={j === "uk" ? "Switch to UK law" : "Switch to Saudi law"}
+                        title="Switch to Canadian law"
                         style={{
                           flex: 1, padding: "5px 4px", borderRadius: "7px", cursor: "pointer",
                           border: isActive ? `1px solid rgba(${jRgb},0.4)` : `1px solid ${tc.toggleBorder}`,

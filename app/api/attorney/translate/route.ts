@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { chatWithSystem, TRANSLATE_PROMPT } from "@/lib/claude";
+import { chatWithSystem, TRANSLATE_PROMPT } from "@/lib/llm";
 import { parseDocumentBuffer } from "@/lib/parse-document";
 
 export async function POST(req: NextRequest) {
@@ -30,11 +30,11 @@ export async function POST(req: NextRequest) {
   }
 
   const directionInstruction =
-    direction === "ar-en"
-      ? "Translate from Arabic to English."
-      : direction === "en-ar"
-      ? "Translate from English to Arabic."
-      : "Detect the language and translate to the other (Arabic to English or English to Arabic).";
+    direction === "fr-en"
+      ? "Translate from French to English."
+      : direction === "en-fr"
+      ? "Translate from English to French."
+      : "Detect the language and translate to the other (French to English or English to French).";
 
   const modeInstruction = mode ? `Terminology domain: ${mode}.` : "";
 

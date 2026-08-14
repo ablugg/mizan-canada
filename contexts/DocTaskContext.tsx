@@ -15,7 +15,7 @@ export type DraftTask = {
   isStreaming: boolean;
   docType: DraftType | "";
   jurisdiction: string;
-  docLang: "en" | "ar";
+  docLang: "en" | "fr";
   fields: Record<string, string>;
   error?: string;
 };
@@ -54,7 +54,7 @@ type DocTaskContextValue = {
   startDraft: (params: {
     docType: DraftType | "";
     jurisdiction: string;
-    docLang: "en" | "ar";
+    docLang: "en" | "fr";
     fields: Record<string, string>;
   }) => void;
   startRedline: (file: File, instruction?: string, clientPosition?: string) => void;
@@ -102,7 +102,7 @@ export function DocTaskProvider({ children }: { children: React.ReactNode }) {
   }: {
     docType: DraftType | "";
     jurisdiction: string;
-    docLang: "en" | "ar";
+    docLang: "en" | "fr";
     fields: Record<string, string>;
   }) {
     const title = `${docType} — ${jurisdiction}`;
@@ -177,6 +177,7 @@ export function DocTaskProvider({ children }: { children: React.ReactNode }) {
         fd.append("file", file);
         if (instruction) fd.append("reviewType", instruction);
         fd.append("clientPosition", clientPosition);
+        fd.append("language", localStorage.getItem("mizan-locale") || "en");
         const res = await fetch("/api/attorney/redline", {
           method: "POST",
           body: fd,
@@ -242,6 +243,7 @@ export function DocTaskProvider({ children }: { children: React.ReactNode }) {
       try {
         const fd = new FormData();
         fd.append("file", file);
+        fd.append("language", localStorage.getItem("mizan-locale") || "en");
         const res = await fetch("/api/attorney/review", {
           method: "POST",
           body: fd,

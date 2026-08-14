@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { retrieveContext } from "@/lib/rag";
 import { db } from "@/lib/db";
-import { chatStream, generateTitle, SYSTEM_PROMPT } from "@/lib/claude";
+import { chatStream, generateTitle, SYSTEM_PROMPT } from "@/lib/llm";
 import { encryptMessage, decryptMessage } from "@/lib/message-crypto";
 import { LOCAL_USER_ID } from "@/lib/local-auth";
 
 export async function POST(req: NextRequest) {
-  const { messages, conversationId, documentIds, attachedFiles, arabicMode } =
+  const { messages, conversationId, documentIds, attachedFiles, frenchMode } =
     await req.json();
 
   const lastUserMessage: string = messages[messages.length - 1]?.content ?? "";
@@ -19,6 +19,9 @@ export async function POST(req: NextRequest) {
       : retrieveContext(lastUserMessage).then((ctx) => {
           console.log(`[chat] RAG context length=${ctx.length} chars`);
           return ctx;
+        }).catch((err) => {
+          console.error("[chat] RAG retrieval failed, proceeding without context:", err);
+          return "";
         }),
     (async () => {
       if (!hasDocuments) return "";
@@ -58,9 +61,9 @@ export async function POST(req: NextRequest) {
 
   const systemWithContext = [
     SYSTEM_PROMPT,
-    arabicMode
-      ? "IMPORTANT: You must respond exclusively in Arabic, regardless of the language used by the user. Do not use any other language in your response."
-      : null,
+    frenchMode
+      ? "IMPORTANT: You must respond exclusively in French, regardless of the language used by the user. Do not use any other language in your response."
+      : "IMPORTANT: You must respond exclusively in English, regardless of the language used by the user. Do not use French, Chinese, or any other language in your response.",
     context ? `Relevant legal context:\n${context}` : null,
     documentContext ? `Uploaded documents for review:\n${documentContext}` : null,
   ]
@@ -126,7 +129,7 @@ export async function POST(req: NextRequest) {
         });
 
         const isGreeting =
-          /^(hi|hello|hey|good\s+morning|good\s+afternoon|good\s+evening|howdy|greetings|مرحبا|أهلا|السلام\s+عليكم)[\s!,.?]*$/i.test(
+          /^(hi|hello|hey|good\s+morning|good\s+afternoon|good\s+evening|howdy|greetings|bonjour|salut|allô)[\s!,.?]*$/i.test(
             lastUserMessage.trim()
           );
 

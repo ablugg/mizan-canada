@@ -1,6 +1,6 @@
 /**
- * Builds the local LanceDB vector store from data/sources/ text files.
- * Uses Ollama's nomic-embed-text model for embeddings.
+ * Builds the local LanceDB vector store from the Justice Canada laws-lois-xml repo.
+ * Clones the repo, parses XML Acts & Regulations, chunks, embeds, and stores vectors.
  *
  * Run with: npm run build:vectors
  * Requires Ollama to be running with nomic-embed-text pulled.
@@ -10,6 +10,7 @@ config({ path: ".env" });
 
 import * as fs from "fs";
 import * as path from "path";
+import { execSync } from "child_process";
 import { Ollama } from "ollama";
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? "http://127.0.0.1:11434";
@@ -18,6 +19,8 @@ const VECTOR_DB_PATH = process.env.VECTOR_DB_PATH ?? path.join(process.cwd(), "d
 const TABLE_NAME = "legal_chunks";
 const CHUNK_SIZE = 400;
 const CHUNK_OVERLAP = 50;
+const REPO_URL = "https://github.com/justicecanada/laws-lois-xml.git";
+const CLONE_DIR = path.join(process.cwd(), "data/sources/laws-lois-xml");
 
 const ollama = new Ollama({ host: OLLAMA_HOST });
 
@@ -40,69 +43,97 @@ async function embedBatch(texts: string[]): Promise<number[][]> {
   return embeddings;
 }
 
-const SOURCES: Array<{
-  file: string;
-  source: string;
-  statute?: string;
-  language: string;
-}> = [
-  { file: "labour-law-en.txt", source: "Saudi Labour Law", statute: "Royal Decree No. M/51", language: "en" },
-  { file: "labour-law-ar.txt", source: "Saudi Labour Law", statute: "Royal Decree No. M/51", language: "ar" },
-  { file: "civil-transactions-law-en.txt", source: "Civil Transactions Law", statute: "Royal Decree No. M/191", language: "en" },
-  { file: "civil-transactions-law-ar.txt", source: "Civil Transactions Law", statute: "Royal Decree No. M/191", language: "ar" },
-  { file: "family-law-en.txt", source: "Family Law", statute: "Royal Decree No. M/73", language: "en" },
-  { file: "family-law-ar.txt", source: "Family Law", statute: "Royal Decree No. M/73", language: "ar" },
-  { file: "regulations-of-the-family-law-en.txt", source: "Regulations of the Family Law", statute: "Royal Order No. 59641", language: "en" },
-  { file: "regulations-of-the-family-law-ar.txt", source: "Regulations of the Family Law", statute: "Royal Order No. 59641", language: "ar" },
-  { file: "law-of-evidence-en.txt", source: "Law of Evidence", statute: "Royal Decree No. M/43", language: "en" },
-  { file: "law-of-evidence-ar.txt", source: "Law of Evidence", statute: "Royal Decree No. M/43", language: "ar" },
-  { file: "procedural-manuals-for-the-evidentiary-law-en.txt", source: "Procedural Manuals for the Evidentiary Law", statute: "Minister of Justice Decision No. 921", language: "en" },
-  { file: "procedural-manuals-for-the-evidentiary-law-ar.txt", source: "Procedural Manuals for the Evidentiary Law", statute: "Minister of Justice Decision No. 921", language: "ar" },
-  { file: "law-of-commercial-courts-en.txt", source: "Law of Commercial Courts", statute: "Royal Decree No. M/93", language: "en" },
-  { file: "law-of-commercial-courts-ar.txt", source: "Law of Commercial Courts", statute: "Royal Decree No. M/93", language: "ar" },
-  { file: "the-implementing-regulations-of-the-commercial-courts-law-en.txt", source: "Implementing Regulations of the Commercial Courts Law", statute: "Minister of Justice Decision No. 8344", language: "en" },
-  { file: "the-implementing-regulations-of-the-commercial-courts-law-ar.txt", source: "Implementing Regulations of the Commercial Courts Law", statute: "Minister of Justice Decision No. 8344", language: "ar" },
-  { file: "bankruptcy-law-en.txt", source: "Bankruptcy Law", statute: "Royal Decree No. M/50", language: "en" },
-  { file: "bankruptcy-law-ar.txt", source: "Bankruptcy Law", statute: "Royal Decree No. M/50", language: "ar" },
-  { file: "implementing-regulations-of-the-bankruptcy-law-en.txt", source: "Implementing Regulations of the Bankruptcy Law", statute: "Council of Ministers Resolution No. 622", language: "en" },
-  { file: "implementing-regulations-of-the-bankruptcy-law-ar.txt", source: "Implementing Regulations of the Bankruptcy Law", statute: "Council of Ministers Resolution No. 622", language: "ar" },
-  { file: "law-of-arbitration-en.txt", source: "Law of Arbitration", statute: "Royal Decree No. M/34", language: "en" },
-  { file: "law-of-arbitration-ar.txt", source: "Law of Arbitration", statute: "Royal Decree No. M/34", language: "ar" },
-  { file: "implementing-regulations-of-the-law-of-arbitration-en.txt", source: "Implementing Regulations of the Law of Arbitration", statute: "Council of Ministers Resolution No. 541", language: "en" },
-  { file: "implementing-regulations-of-the-law-of-arbitration-ar.txt", source: "Implementing Regulations of the Law of Arbitration", statute: "Council of Ministers Resolution No. 541", language: "ar" },
-  { file: "law-of-real-estate-registration-en.txt", source: "Law of Real Estate Registration", statute: "Royal Decree No. M/91", language: "en" },
-  { file: "law-of-real-estate-registration-ar.txt", source: "Law of Real Estate Registration", statute: "Royal Decree No. M/91", language: "ar" },
-  { file: "law-of-real-estate-ownership-by-non-saudis-en.txt", source: "Law of Real Estate Ownership by Non-Saudis", statute: "Royal Decree No. M/14", language: "en" },
-  { file: "law-of-real-estate-ownership-by-non-saudis-ar.txt", source: "Law of Real Estate Ownership by Non-Saudis", statute: "Royal Decree No. M/14", language: "ar" },
-  { file: "anti-money-laundering-law-en.txt", source: "Anti-Money Laundering Law", statute: "Royal Decree No. M/20", language: "en" },
-  { file: "anti-money-laundering-law-ar.txt", source: "Anti-Money Laundering Law", statute: "Royal Decree No. M/20", language: "ar" },
-  { file: "law-of-combating-crimes-of-terrorism-and-its-financing-en.txt", source: "Law of Combating Crimes of Terrorism and its Financing", statute: "Royal Decree No. M/21", language: "en" },
-  { file: "law-of-combating-crimes-of-terrorism-and-its-financing-ar.txt", source: "Law of Combating Crimes of Terrorism and its Financing", statute: "Royal Decree No. M/21", language: "ar" },
-  { file: "implementing-regulations-of-the-law-of-criminal-procedure-en.txt", source: "Implementing Regulations of the Law of Criminal Procedure", statute: "Council of Ministers Resolution No. 142", language: "en" },
-  { file: "implementing-regulations-of-the-law-of-criminal-procedure-ar.txt", source: "Implementing Regulations of the Law of Criminal Procedure", statute: "Council of Ministers Resolution No. 142", language: "ar" },
-  { file: "notarization-law-en.txt", source: "Notarization Law", statute: "Royal Decree No. M/164", language: "en" },
-  { file: "notarization-law-ar.txt", source: "Notarization Law", statute: "Royal Decree No. M/164", language: "ar" },
-  { file: "law-on-the-protection-of-informants-witnesses-experts-and-victims-en.txt", source: "Law on the Protection of Informants, Witnesses, Experts, and Victims", statute: "Royal Decree No. M/148", language: "en" },
-  { file: "law-on-the-protection-of-informants-witnesses-experts-and-victims-ar.txt", source: "Law on the Protection of Informants, Witnesses, Experts, and Victims", statute: "Royal Decree No. M/148", language: "ar" },
-  { file: "juveniles-law-en.txt", source: "Juveniles Law", statute: "Royal Decree No. M/113", language: "en" },
-  { file: "juveniles-law-ar.txt", source: "Juveniles Law", statute: "Royal Decree No. M/113", language: "ar" },
-  { file: "implementing-regulations-of-the-juveniles-law-en.txt", source: "Implementing Regulations of the Juveniles Law", statute: "Council of Ministers Resolution No. 237", language: "en" },
-  { file: "implementing-regulations-of-the-juveniles-law-ar.txt", source: "Implementing Regulations of the Juveniles Law", statute: "Council of Ministers Resolution No. 237", language: "ar" },
-  { file: "law-of-criminal-procedure-annotated-ar.txt", source: "Law of Criminal Procedure -- Annotated Consolidated Edition", statute: "Royal Decree No. M/2 (Annotated, MOJ Research Centre 1442H)", language: "ar" },
-  { file: "implementing-regulations-of-the-code-of-law-practice-en.txt", source: "Implementing Regulations of the Code of Law Practice", statute: "Minister of Justice Decision No. 676", language: "en" },
-  { file: "implementing-regulations-of-the-code-of-law-practice-ar.txt", source: "Implementing Regulations of the Code of Law Practice", statute: "Minister of Justice Decision No. 676", language: "ar" },
-  { file: "rules-of-professional-conduct-for-lawyers-en.txt", source: "Rules of Professional Conduct for Lawyers", statute: "Minister of Justice Decision No. 3453", language: "en" },
-  { file: "rules-of-professional-conduct-for-lawyers-ar.txt", source: "Rules of Professional Conduct for Lawyers", statute: "Minister of Justice Decision No. 3453", language: "ar" },
-  { file: "law-of-judicial-fees-en.txt", source: "Law of Judicial Fees", statute: "Royal Decree No. M/16", language: "en" },
-  { file: "law-of-judicial-fees-ar.txt", source: "Law of Judicial Fees", statute: "Royal Decree No. M/16", language: "ar" },
-  { file: "the-implementing-regulations-of-the-enforcement-law-en.txt", source: "Implementing Regulations of the Enforcement Law", statute: "Minister of Justice Decision No. 526", language: "en" },
-  { file: "the-implementing-regulations-of-the-enforcement-law-ar.txt", source: "Implementing Regulations of the Enforcement Law", statute: "Minister of Justice Decision No. 526", language: "ar" },
-  { file: "implementing-regulations-of-appeal-procedures-en.txt", source: "Implementing Regulations of Appeal Procedures", statute: "Minister of Justice Decision No. 5134", language: "en" },
-  { file: "implementing-regulations-of-appeal-procedures-ar.txt", source: "Implementing Regulations of Appeal Procedures", statute: "Minister of Justice Decision No. 5134", language: "ar" },
-];
+// ── XML text extraction ─────────────────────────────────────────────────────
+
+function stripXmlTags(xml: string): string {
+  // Remove XML declaration and processing instructions
+  let text = xml.replace(/<\?[^?]*\?>/g, "");
+  // Remove all XML tags but keep text content
+  text = text.replace(/<[^>]+>/g, " ");
+  // Decode common XML entities
+  text = text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#\d+;/g, "");
+  // Collapse whitespace
+  text = text.replace(/\s+/g, " ").trim();
+  return text;
+}
+
+function extractTitle(xml: string): string {
+  // Try ShortTitle first, then LongTitle
+  const shortMatch = xml.match(/<ShortTitle[^>]*>([^<]+)<\/ShortTitle>/);
+  if (shortMatch) return shortMatch[1].trim();
+  const longMatch = xml.match(/<LongTitle[^>]*>([^<]+)<\/LongTitle>/);
+  if (longMatch) return longMatch[1].trim();
+  return "";
+}
+
+function extractStatuteRef(xml: string): string {
+  // For acts: ConsolidatedNumber
+  const consolMatch = xml.match(/<ConsolidatedNumber[^>]*>([^<]+)<\/ConsolidatedNumber>/);
+  if (consolMatch) return consolMatch[1].trim();
+  // For regulations: InstrumentNumber
+  const instrMatch = xml.match(/<InstrumentNumber[^>]*>([^<]+)<\/InstrumentNumber>/);
+  if (instrMatch) return instrMatch[1].trim();
+  return "";
+}
+
+function detectType(xml: string): "act" | "regulation" {
+  if (xml.includes("<Regulation")) return "regulation";
+  return "act";
+}
+
+// ── Clone or update repo ────────────────────────────────────────────────────
+
+function ensureRepo(): void {
+  if (fs.existsSync(path.join(CLONE_DIR, ".git"))) {
+    console.log("Repo exists, pulling latest…");
+    execSync("git pull --ff-only", { cwd: CLONE_DIR, stdio: "inherit" });
+  } else {
+    console.log("Cloning Justice Canada laws repo (shallow)…");
+    fs.mkdirSync(path.dirname(CLONE_DIR), { recursive: true });
+    execSync(`git clone --depth 1 "${REPO_URL}" "${CLONE_DIR}"`, { stdio: "inherit" });
+  }
+}
+
+// ── Discover all XML files ──────────────────────────────────────────────────
+
+interface LawFile {
+  filePath: string;
+  language: "en" | "fr";
+  category: "act" | "regulation";
+}
+
+function discoverLawFiles(): LawFile[] {
+  const files: LawFile[] = [];
+
+  for (const lang of [{ dir: "eng", code: "en" as const }, { dir: "fra", code: "fr" as const }]) {
+    for (const cat of [{ dir: "acts", code: "act" as const }, { dir: "regulations", code: "regulation" as const }]) {
+      const dir = path.join(CLONE_DIR, lang.dir, cat.dir);
+      if (!fs.existsSync(dir)) continue;
+
+      const xmlFiles = fs.readdirSync(dir).filter((f) => f.endsWith(".xml"));
+      for (const f of xmlFiles) {
+        files.push({
+          filePath: path.join(dir, f),
+          language: lang.code,
+          category: cat.code,
+        });
+      }
+    }
+  }
+
+  return files;
+}
+
+// ── Main ────────────────────────────────────────────────────────────────────
 
 export async function main() {
-  console.log(`Building Mizan vector store -- ${SOURCES.length} source files\n`);
+  console.log("Building Mizan vector store — Canadian law\n");
   console.log(`Output: ${VECTOR_DB_PATH}\n`);
 
   // Ensure Ollama is reachable
@@ -115,80 +146,113 @@ export async function main() {
     process.exit(1);
   }
 
+  // Clone/update repo
+  ensureRepo();
+
+  // Discover files
+  const lawFiles = discoverLawFiles();
+  console.log(`\nFound ${lawFiles.length} XML files\n`);
+
   const lancedb = await import("@lancedb/lancedb");
   const db = await lancedb.connect(VECTOR_DB_PATH);
 
   let allRecords: Record<string, unknown>[] = [];
   let completed = 0;
   let skipped = 0;
+  let totalRecords = 0;
+  let tableCreated = false;
   const failed: string[] = [];
 
-  for (const source of SOURCES) {
-    const filePath = path.resolve(`./data/sources/${source.file}`);
-    const num = completed + skipped + failed.length + 1;
+  const FLUSH_THRESHOLD = 1000; // flush every 1000 records
 
-    if (!fs.existsSync(filePath)) {
-      console.log(`[${num}/${SOURCES.length}] SKIP (not found) -- ${source.file}`);
-      skipped++;
-      continue;
+  // Drop existing table for a clean build
+  try { await db.dropTable(TABLE_NAME); } catch { /* didn't exist */ }
+
+  async function flush() {
+    if (allRecords.length === 0) return;
+    console.log(`\n  Flushing ${allRecords.length} records (total so far: ${totalRecords + allRecords.length})…\n`);
+    if (!tableCreated) {
+      await db.createTable(TABLE_NAME, allRecords);
+      tableCreated = true;
+    } else {
+      const table = await db.openTable(TABLE_NAME);
+      await table.add(allRecords);
     }
+    totalRecords += allRecords.length;
+    allRecords = [];
+  }
 
-    console.log(`[${num}/${SOURCES.length}] ${source.source} (${source.language.toUpperCase()})`);
+  for (let i = 0; i < lawFiles.length; i++) {
+    const law = lawFiles[i];
+    const num = i + 1;
+    const fileName = path.basename(law.filePath);
 
     try {
-      const text = fs.readFileSync(filePath, "utf-8");
-      const isLargeAnnotated = source.file.includes("annotated");
-      const chunkSize = isLargeAnnotated ? 80 : source.language === "ar" ? 150 : CHUNK_SIZE;
+      const xml = fs.readFileSync(law.filePath, "utf-8");
+
+      const title = extractTitle(xml);
+      if (!title) {
+        skipped++;
+        continue;
+      }
+
+      const statuteRef = extractStatuteRef(xml);
+      const type = detectType(xml);
+      const text = stripXmlTags(xml);
+
+      if (text.length < 100) {
+        skipped++;
+        continue;
+      }
+
+      const chunkSize = law.language === "fr" ? 300 : CHUNK_SIZE;
       const chunks = chunkText(text, chunkSize);
-      console.log(`  ${chunks.length} chunks`);
+
+      if (chunks.length === 0) {
+        skipped++;
+        continue;
+      }
+
+      console.log(`[${num}/${lawFiles.length}] ${title} (${law.language.toUpperCase()}, ${type}) — ${chunks.length} chunks`);
 
       const embeddings = await embedBatch(chunks);
 
-      for (let i = 0; i < chunks.length; i++) {
+      for (let j = 0; j < chunks.length; j++) {
         allRecords.push({
-          id: `${source.file.replace(/[^a-z0-9]/gi, "-")}-${i}`,
-          vector: embeddings[i],
-          text: chunks[i],
-          source: source.source,
-          jurisdiction: "Saudi Arabia",
-          statute: source.statute ?? "",
+          id: `${fileName.replace(/[^a-z0-9]/gi, "-")}-${law.language}-${j}`,
+          vector: embeddings[j],
+          text: chunks[j],
+          source: title,
+          jurisdiction: "Canada",
+          statute: statuteRef ? `${type === "act" ? "R.S.C." : ""} ${statuteRef}`.trim() : "",
           section: "",
-          language: source.language,
+          language: law.language,
         });
       }
 
       completed++;
-      console.log("  Done.\n");
+
+      if (allRecords.length >= FLUSH_THRESHOLD) {
+        await flush();
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`  FAILED: ${msg}\n`);
-      failed.push(source.file);
+      console.error(`[${num}/${lawFiles.length}] FAILED ${fileName}: ${msg}`);
+      failed.push(fileName);
     }
   }
 
-  if (allRecords.length === 0) {
-    console.error("No records to write. Exiting.");
-    process.exit(1);
-  }
+  // Write remaining records
+  await flush();
 
-  console.log(`Writing ${allRecords.length} vectors to LanceDB...`);
-
-  try {
-    // Drop and recreate for a clean build
-    await db.dropTable(TABLE_NAME);
-  } catch {
-    // Table didn't exist yet
-  }
-
-  await db.createTable(TABLE_NAME, allRecords);
-  console.log("Vector store built successfully.\n");
-
+  console.log("\nVector store built successfully.\n");
   console.log("Summary:");
   console.log(`  Completed: ${completed}`);
-  console.log(`  Skipped (not found): ${skipped}`);
+  console.log(`  Skipped: ${skipped}`);
   console.log(`  Failed: ${failed.length}`);
   if (failed.length > 0) {
-    failed.forEach((f) => console.log(`    - ${f}`));
+    failed.slice(0, 20).forEach((f) => console.log(`    - ${f}`));
+    if (failed.length > 20) console.log(`    … and ${failed.length - 20} more`);
   }
 }
 

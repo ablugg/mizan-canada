@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { chatWithSystem } from "@/lib/claude";
+import { chatWithSystem } from "@/lib/llm";
 import { parseDocumentBuffer } from "@/lib/parse-document";
 import { CLAUSE_CATEGORIES } from "@/types";
 

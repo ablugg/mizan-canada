@@ -38,7 +38,7 @@ export default function ChatPage() {
   const [showInput, setShowInput] = useState(true);
   const [isScrolling, setIsScrolling] = useState(false);
   const [sidebarHidden, setSidebarHidden] = useState(false);
-  const [arabicMode, setArabicMode] = useState(false);
+  const [frenchMode, setFrenchMode] = useState(false);
   const [starsVisible, setStarsVisible] = useState(true);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -300,12 +300,12 @@ export default function ChatPage() {
         }}
       >
         <ChatInput
-          onSend={(msg, files) => { setShowInput(true); sendMessage(msg, files, arabicMode); }}
+          onSend={(msg, files) => { setShowInput(true); sendMessage(msg, files, frenchMode); }}
           onStop={stopStreaming}
           onHide={messages.length > 0 ? () => setShowInput(false) : undefined}
           isStreaming={isStreaming}
-          arabicMode={arabicMode}
-          onArabicToggle={setArabicMode}
+          frenchMode={frenchMode}
+          onFrenchToggle={setFrenchMode}
         />
       </div>
     </div>

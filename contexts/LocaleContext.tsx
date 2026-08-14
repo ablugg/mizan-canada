@@ -28,15 +28,15 @@ export function LocaleProvider({
   // On mount, check localStorage for user override
   useEffect(() => {
     const stored = localStorage.getItem("mizan-locale") as Locale | null;
-    if (stored === "ar" || stored === "en") {
+    if (stored === "fr" || stored === "en") {
       setLocaleState(stored);
     }
   }, []);
 
-  // Sync html dir/lang when locale changes
+  // Sync html lang when locale changes (both languages are LTR)
   useEffect(() => {
     document.documentElement.lang = locale;
-    document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
+    document.documentElement.dir = "ltr";
   }, [locale]);
 
   const setLocale = useCallback((newLocale: Locale) => {
@@ -48,7 +48,7 @@ export function LocaleProvider({
 
   return (
     <LocaleContext.Provider
-      value={{ locale, setLocale, t, isRTL: locale === "ar" }}
+      value={{ locale, setLocale, t, isRTL: false }}
     >
       {children}
     </LocaleContext.Provider>
