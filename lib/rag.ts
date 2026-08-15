@@ -54,7 +54,7 @@ export interface LegalChunk {
 
 export async function retrieveContext(
   query: string,
-  topK = 3,
+  topK = 2,
   jurisdiction = "ca"
 ): Promise<string> {
   const queryEmbedding = await embed(query);

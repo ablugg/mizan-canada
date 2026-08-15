@@ -70,51 +70,15 @@ export function ResearchProvider({ children }: { children: React.ReactNode }) {
 
       if (!response.ok) throw new Error("Request failed");
 
-      let accumulated = "";
-      let displayed = "";
-      let animating = false;
-      let streamDone = false;
-      let resolveAnimation: (() => void) | null = null;
-
-      function animateNext() {
-        if (displayed.length >= accumulated.length) {
-          animating = false;
-          setMessages((prev) =>
-            prev.map((m) => (m.id === aiId ? { ...m, content: accumulated } : m))
-          );
-          // If stream is done and animation caught up, resolve the wait
-          if (streamDone && resolveAnimation) resolveAnimation();
-          return;
-        }
-        displayed += accumulated.slice(displayed.length, displayed.length + 4);
-        const snap = displayed;
-        setMessages((prev) =>
-          prev.map((m) => (m.id === aiId ? { ...m, content: snap } : m))
-        );
-        requestAnimationFrame(animateNext);
-      }
-
       if (!response.body) throw new Error("No body");
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        accumulated += decoder.decode(value, { stream: true });
-        if (!animating) {
-          animating = true;
-          requestAnimationFrame(animateNext);
-        }
-      }
-
-      // Wait for animation to finish flushing all content before marking done
-      streamDone = true;
-      if (animating) {
-        await new Promise<void>((resolve) => { resolveAnimation = resolve; });
-      } else {
-        // Animation already caught up, set final content
+        const chunk = decoder.decode(value, { stream: true });
         setMessages((prev) =>
-          prev.map((m) => (m.id === aiId ? { ...m, content: accumulated } : m))
+          prev.map((m) => (m.id === aiId ? { ...m, content: m.content + chunk } : m))
         );
       }
     } catch (err) {

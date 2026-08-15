@@ -29,8 +29,9 @@ export function getOllama() {
 //   for typical legal queries.
 // num_gpu: 99 pins all layers onto Metal/GPU on Apple Silicon.
 const INFERENCE_OPTIONS = {
-  num_ctx: 8192,
+  num_ctx: 4096,
   num_gpu: 99,
+  num_batch: 512,
 } as const;
 
 export const SYSTEM_PROMPT = `You are Mizan, an AI legal assistant specializing in Canadian law. You are precise, structured, and authoritative.

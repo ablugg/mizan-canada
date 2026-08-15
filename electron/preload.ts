@@ -20,21 +20,46 @@ contextBridge.exposeInMainWorld("electron", {
   app: {
     version: () => ipcRenderer.invoke("app:version"),
     userData: () => ipcRenderer.invoke("app:userData"),
-    checkUpdate: (): Promise<{ hasUpdate: boolean; latest?: string; current?: string; releaseUrl?: string; downloadUrl?: string }> =>
-      ipcRenderer.invoke("app:checkUpdate"),
     hardware: (): Promise<{ totalRam: number; cpuModel: string; cpuCores: number; platform: string; arch: string }> =>
       ipcRenderer.invoke("app:hardware"),
-    downloadUpdate: (
-      url: string,
-      onProgress: (p: { downloaded: number; total: number; pct: number }) => void
-    ) => {
-      const handler = (_: unknown, progress: unknown) => onProgress(progress as { downloaded: number; total: number; pct: number });
-      ipcRenderer.on("app:update-progress", handler);
-      return ipcRenderer
-        .invoke("app:downloadUpdate", url)
-        .finally(() => ipcRenderer.removeListener("app:update-progress", handler)) as Promise<{ ok: boolean; filePath?: string; error?: string }>;
+  },
+
+  updater: {
+    check: (): Promise<{ hasUpdate: boolean; version?: string }> =>
+      ipcRenderer.invoke("updater:check"),
+
+    download: () => ipcRenderer.invoke("updater:download"),
+
+    install: () => ipcRenderer.invoke("updater:install"),
+
+    onUpdateAvailable: (cb: (info: { version: string }) => void) => {
+      const handler = (_: unknown, data: unknown) => cb(data as { version: string });
+      ipcRenderer.on("updater:update-available", handler);
+      return () => ipcRenderer.removeListener("updater:update-available", handler);
     },
-    installUpdate: (filePath: string): Promise<{ ok: boolean }> =>
-      ipcRenderer.invoke("app:installUpdate", filePath),
+
+    onUpdateNotAvailable: (cb: () => void) => {
+      const handler = () => cb();
+      ipcRenderer.on("updater:update-not-available", handler);
+      return () => ipcRenderer.removeListener("updater:update-not-available", handler);
+    },
+
+    onDownloadProgress: (cb: (info: { pct: number }) => void) => {
+      const handler = (_: unknown, data: unknown) => cb(data as { pct: number });
+      ipcRenderer.on("updater:download-progress", handler);
+      return () => ipcRenderer.removeListener("updater:download-progress", handler);
+    },
+
+    onUpdateDownloaded: (cb: () => void) => {
+      const handler = () => cb();
+      ipcRenderer.on("updater:update-downloaded", handler);
+      return () => ipcRenderer.removeListener("updater:update-downloaded", handler);
+    },
+
+    onError: (cb: (info: { message: string }) => void) => {
+      const handler = (_: unknown, data: unknown) => cb(data as { message: string });
+      ipcRenderer.on("updater:error", handler);
+      return () => ipcRenderer.removeListener("updater:error", handler);
+    },
   },
 });

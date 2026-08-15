@@ -67,10 +67,8 @@ export default function ResearchPage() {
       const lastUser = [...messages].reverse().find((m) => m.role === "user");
       if (!lastAssistant?.content || !lastUser?.content) return;
 
-      // Auto-save session after each response (short delay to ensure final content is flushed)
-      if (!isRestoredRef.current) {
-        setTimeout(() => saveSession(messages), 100);
-      }
+      // Auto-save session after each response
+      setTimeout(() => saveSession(messages), 100);
 
       setSuggestions([]);
       fetch("/api/attorney/research/suggestions", {
@@ -112,10 +110,15 @@ export default function ResearchPage() {
   }
 
   async function handleNewSession() {
+    // Save current session before clearing
+    if (messages.length >= 2) {
+      await saveSession(messages);
+    }
     isRestoredRef.current = false;
     sessionIdRef.current = null;
     setSuggestions([]);
     reset();
+    setHistoryRefresh((n) => n + 1);
   }
 
   function exportTranscript() {

@@ -93,7 +93,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const stream = chatStream(messages, context, systemWithContext);
+  // Keep only last 6 messages (3 exchanges) to limit prompt size and speed up inference
+  const trimmedMessages = messages.slice(-6);
+
+  const stream = chatStream(trimmedMessages, context, systemWithContext);
 
   let fullResponse = "";
   let chunkCount = 0;

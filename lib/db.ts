@@ -7,7 +7,8 @@ function getDatabaseUrl(): string {
   const envUrl = process.env.DATABASE_URL;
   // Only accept file: URLs (SQLite) -- ignore any cloud DB URLs from other forks
   if (envUrl && envUrl.startsWith("file:")) return envUrl;
-  const dbPath = path.join(process.cwd(), "mizan-dev.db");
+  // Prisma resolves relative paths from the schema dir (prisma/), so match that
+  const dbPath = path.join(process.cwd(), "prisma", "mizan-dev.db");
   return `file:${dbPath}`;
 }
 

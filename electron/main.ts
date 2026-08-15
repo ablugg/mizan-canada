@@ -1,15 +1,16 @@
-import { app, BrowserWindow, ipcMain, shell, Menu, globalShortcut, utilityProcess } from "electron";
+import { app, BrowserWindow, ipcMain, shell, Menu, globalShortcut } from "electron";
+import { autoUpdater } from "electron-updater";
 import path from "path";
 import { startNextServer, stopNextServer } from "./server";
 import { OllamaManager } from "./ollama";
 
-// Remove default Electron menu bar — app is entirely self-contained
+// Remove default Electron menu bar -- app is entirely self-contained
 Menu.setApplicationMenu(null);
 
 // Set the app name so macOS menu bar and dock show "Mizan"
 app.setName("Mizan");
 
-// Enforce single instance — second launch focuses the existing window instead
+// Enforce single instance -- second launch focuses the existing window instead
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -49,7 +50,7 @@ function createWindow(port: number) {
 
   // If the page fails to load, retry after a short delay
   mainWindow.webContents.on("did-fail-load", (_e, code, desc) => {
-    console.error(`[main] Page load failed (${code}: ${desc}), retrying in 1s…`);
+    console.error(`[main] Page load failed (${code}: ${desc}), retrying in 1s...`);
     setTimeout(() => mainWindow?.loadURL(`http://127.0.0.1:${port}`), 1000);
   });
 
@@ -70,8 +71,39 @@ app.on("second-instance", () => {
   }
 });
 
+// --- Auto-updater setup ---
+
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+
+function sendUpdateStatus(channel: string, data: unknown) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(channel, data);
+  }
+}
+
+autoUpdater.on("update-available", (info) => {
+  sendUpdateStatus("updater:update-available", { version: info.version });
+});
+
+autoUpdater.on("update-not-available", () => {
+  sendUpdateStatus("updater:update-not-available", {});
+});
+
+autoUpdater.on("download-progress", (progress) => {
+  sendUpdateStatus("updater:download-progress", { pct: Math.round(progress.percent) });
+});
+
+autoUpdater.on("update-downloaded", () => {
+  sendUpdateStatus("updater:update-downloaded", {});
+});
+
+autoUpdater.on("error", (err) => {
+  sendUpdateStatus("updater:error", { message: err.message });
+});
+
 app.whenReady().then(async () => {
-  // Start Ollama in the background — it is non-blocking.
+  // Start Ollama in the background -- it is non-blocking.
   // The UI will show a setup screen if the model isn't ready yet.
   const ollama = OllamaManager.getInstance();
   ollama.start().catch((err) => {
@@ -138,103 +170,24 @@ ipcMain.handle("app:hardware", async () => {
   return { totalRam, cpuModel, cpuCores, platform, arch };
 });
 
-// --- IPC: Update check ---
+// --- IPC: Auto-updater ---
 
-ipcMain.handle("app:checkUpdate", async () => {
+ipcMain.handle("updater:check", async () => {
   try {
-    const res = await fetch(
-      "https://api.github.com/repos/ablugg/mizan-canada/releases/latest",
-      { headers: { "User-Agent": "Mizan-Canada" }, signal: AbortSignal.timeout(8000) }
-    );
-    if (!res.ok) return { hasUpdate: false };
-    const data = await res.json() as { tag_name?: string; assets?: Array<{ name: string; browser_download_url: string }> };
-    const latest = (data.tag_name ?? "").replace(/^v/, "");
-    const current = app.getVersion();
-    const hasUpdate = latest !== "" && latest !== current;
-
-    // Find the right asset for this platform + arch
-    let downloadUrl = "";
-    if (hasUpdate && data.assets) {
-      const plat = process.platform;
-      const arch = process.arch;
-      if (plat === "darwin") {
-        const suffix = arch === "arm64" ? "-arm64.dmg" : ".dmg";
-        const asset = data.assets.find(a => a.name.endsWith(suffix) && (arch !== "arm64" || a.name.includes("arm64")))
-          ?? data.assets.find(a => a.name.endsWith(".dmg"));
-        if (asset) downloadUrl = asset.browser_download_url;
-      } else if (plat === "win32") {
-        const asset = data.assets.find(a => a.name.endsWith(".exe"));
-        if (asset) downloadUrl = asset.browser_download_url;
-      } else {
-        const asset = data.assets.find(a => a.name.endsWith(".AppImage") && a.name.includes(arch))
-          ?? data.assets.find(a => a.name.endsWith(".deb") && a.name.includes(arch));
-        if (asset) downloadUrl = asset.browser_download_url;
-      }
+    const result = await autoUpdater.checkForUpdates();
+    if (result && result.updateInfo) {
+      return { hasUpdate: true, version: result.updateInfo.version };
     }
-
-    return {
-      hasUpdate,
-      latest,
-      current,
-      releaseUrl: `https://github.com/ablugg/mizan-canada/releases/latest`,
-      downloadUrl,
-    };
+    return { hasUpdate: false };
   } catch {
     return { hasUpdate: false };
   }
 });
 
-// --- IPC: Download and install update ---
-
-ipcMain.handle("app:downloadUpdate", async (event, downloadUrl: string) => {
-  try {
-    const fs = await import("fs");
-    const os = await import("os");
-    const p = await import("path");
-
-    const res = await fetch(downloadUrl, {
-      headers: { "User-Agent": "Mizan-Canada" },
-      signal: AbortSignal.timeout(600000),
-    });
-    if (!res.ok || !res.body) return { ok: false, error: `Download failed (${res.status})` };
-
-    const contentLength = Number(res.headers.get("content-length") ?? 0);
-    const fileName = downloadUrl.split("/").pop() ?? "update";
-    const tmpDir = os.tmpdir();
-    const filePath = p.join(tmpDir, fileName);
-    const writeStream = fs.createWriteStream(filePath);
-
-    let downloaded = 0;
-    const reader = res.body.getReader();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      writeStream.write(Buffer.from(value));
-      downloaded += value.byteLength;
-      if (!event.sender.isDestroyed() && contentLength > 0) {
-        event.sender.send("app:update-progress", {
-          downloaded,
-          total: contentLength,
-          pct: Math.round((downloaded / contentLength) * 100),
-        });
-      }
-    }
-
-    writeStream.end();
-    await new Promise<void>((resolve) => writeStream.on("finish", resolve));
-
-    return { ok: true, filePath };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { ok: false, error: msg };
-  }
+ipcMain.handle("updater:download", () => {
+  autoUpdater.downloadUpdate();
 });
 
-// --- IPC: Open downloaded file and quit ---
-
-ipcMain.handle("app:installUpdate", async (_event, filePath: string) => {
-  shell.openPath(filePath);
-  setTimeout(() => app.quit(), 1000);
-  return { ok: true };
+ipcMain.handle("updater:install", () => {
+  autoUpdater.quitAndInstall(false, true);
 });
