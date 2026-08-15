@@ -270,9 +270,10 @@ export default function SetupPage() {
   const pullingEmbed = useRef(false);
 
   useEffect(() => {
-    fetch("/api/setup/migrate", { method: "POST" }).catch(() => {});
+    const migratePromise = fetch("/api/setup/migrate", { method: "POST" }).catch(() => {});
     if (typeof window !== "undefined" && localStorage.getItem("mizan-setup-done") === "1") {
-      router.replace("/attorney/research");
+      // Wait for migrate to finish before redirecting so the local user exists
+      migratePromise.then(() => router.replace("/attorney/research"));
       return;
     }
     detectHardware();

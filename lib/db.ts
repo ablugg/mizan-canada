@@ -15,24 +15,36 @@ function getDatabaseUrl(): string {
 // Always set DATABASE_URL to ensure Prisma uses local SQLite
 process.env.DATABASE_URL = getDatabaseUrl();
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+  localUserEnsured: boolean | undefined;
+};
 
 export const db = globalForPrisma.prisma ?? new PrismaClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
 
 // Ensures the local user record exists on first run.
-// Called once at startup from the setup API route.
+// Runs lazily on first DB access and from the setup API route.
 export async function ensureLocalUser(): Promise<void> {
+  if (globalForPrisma.localUserEnsured) return;
   const LOCAL_USER_ID = "local";
-  const existing = await db.user.findUnique({ where: { id: LOCAL_USER_ID } });
-  if (!existing) {
-    await db.user.create({
-      data: {
-        id: LOCAL_USER_ID,
-        email: "local@mizan.app",
-        name: "Local User",
-      },
-    });
+  try {
+    const existing = await db.user.findUnique({ where: { id: LOCAL_USER_ID } });
+    if (!existing) {
+      await db.user.create({
+        data: {
+          id: LOCAL_USER_ID,
+          email: "local@mizan.app",
+          name: "Local User",
+        },
+      });
+    }
+    globalForPrisma.localUserEnsured = true;
+  } catch {
+    // Table may not exist yet -- migrate route will handle it
   }
 }
+
+// Kick off user creation eagerly so it is ready before any API route needs it
+ensureLocalUser();
