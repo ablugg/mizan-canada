@@ -1,0 +1,62 @@
+name: Build macOS
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env.app from secret
+        run: echo "${{ secrets.ENV_APP }}" > .env.app
+
+      - name: Download Ollama (macOS)
+        run: npx tsx scripts/download-ollama.ts
+
+      - name: Build
+        run: npm run electron:build -- --mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.MAC_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Rename artifacts (spaces → hyphens)
+        run: |
+          cd dist-electron
+          for f in Mizan\ Canada-*; do
+            newname=$(echo "$f" | sed 's/ /-/g')
+            [ "$f" != "$newname" ] && cp "$f" "$newname"
+          done
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist-electron/Mizan-Canada-*-arm64.dmg
+            dist-electron/Mizan-Canada-*.dmg
+            dist-electron/Mizan-Canada-*-arm64-mac.zip
+            dist-electron/Mizan-Canada-*-mac.zip
+            dist-electron/latest-mac.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

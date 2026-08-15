@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write          # needed for SignPath signing
 
 jobs:
   build-windows:
@@ -25,7 +26,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Download Ollama (Windows — full zip with llama-server.exe)
+      - name: Create .env.app from secret
+        run: |
+          echo "${{ secrets.ENV_APP }}" > .env.app
+        shell: bash
+
+      - name: Download Ollama (Windows)
         run: npx tsx scripts/download-ollama.ts
 
       - name: Build
@@ -33,10 +39,33 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Windows installer to release
+      - name: Sign with SignPath
+        if: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG != '' }}
+        uses: SignPath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: mizan-canada
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: windows-exe
+          input-artifact-path: dist-electron/Mizan Canada.Setup.${{ github.ref_name }}.exe
+          output-artifact-path: dist-electron/Mizan Canada.Setup.${{ github.ref_name }}.exe
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 600
+
+      - name: Rename artifact for release
+        run: |
+          $version = "${{ github.ref_name }}"
+          $src = "dist-electron/Mizan Canada.Setup.${version}.exe"
+          $dst = "dist-electron/Mizan-Canada.Setup.${version}.exe"
+          if (Test-Path $src) { Copy-Item $src $dst }
+        shell: pwsh
+
+      - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist-electron/Mizan.Setup.*.exe
+            dist-electron/Mizan-Canada.Setup.*.exe
+            dist-electron/latest.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
