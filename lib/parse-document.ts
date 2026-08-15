@@ -14,12 +14,11 @@ export async function parseDocumentBuffer(
   const isWord = mimeType.includes("word") || /\.docx?$/.test(fileName);
 
   if (isPdf) {
-    // Primary: pdf-parse
+    // Primary: pdf-parse v2
     try {
-      const pdfParseModule = await import("pdf-parse");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pdfParse = ((pdfParseModule as any).default ?? pdfParseModule) as (buf: Buffer) => Promise<{ text: string }>;
-      const result = await pdfParse(buffer);
+      const { PDFParse } = await import("pdf-parse");
+      const parser = new PDFParse({ data: buffer });
+      const result = await parser.getText();
       if (result.text?.trim()) return result.text;
     } catch {
       // fall through to pdf2json

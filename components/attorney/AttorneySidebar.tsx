@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, FileSearch, FileText, Scissors, Menu, ChevronLeft, ChevronRight, Languages, BookOpen, CalendarClock, Sun, Moon, BarChart2, Globe, LibraryBig, Heart } from "lucide-react";
+import { Search, FileSearch, FileText, Scissors, Menu, ChevronLeft, ChevronRight, Languages, BookOpen, CalendarClock, Sun, Moon, BarChart2, Globe, LibraryBig, Heart, ScanSearch } from "lucide-react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useJurisdiction } from "@/contexts/JurisdictionContext";
 import type { TranslationKey } from "@/lib/i18n";
 
 const TOOL_DEFS: { href: string; labelKey: TranslationKey; subKey: TranslationKey; icon: React.ElementType }[] = [
   { href: "/attorney/research", labelKey: "attorney.research", subKey: "attorney.research.sub", icon: Search },
+  { href: "/attorney/smart-scan", labelKey: "attorney.smartScan", subKey: "attorney.smartScan.sub", icon: ScanSearch },
   { href: "/attorney/review", labelKey: "attorney.review", subKey: "attorney.review.sub", icon: FileSearch },
   { href: "/attorney/draft", labelKey: "attorney.draft", subKey: "attorney.draft.sub", icon: FileText },
   { href: "/attorney/redline", labelKey: "attorney.redline", subKey: "attorney.redline.sub", icon: Scissors },
