@@ -18,6 +18,7 @@ export default function ResearchPage() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const prevStreamingRef = useRef(false);
   const isRestoredRef = useRef(false);
+  const sessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -29,6 +30,33 @@ export default function ResearchPage() {
     }
   }, [suggestions]);
 
+  const saveSession = useCallback(async (msgs: Message[]) => {
+    if (msgs.length === 0) return;
+    const firstUserMsg = msgs.find((m) => m.role === "user");
+    if (!firstUserMsg) return;
+    const title = firstUserMsg.content.slice(0, 60);
+    try {
+      const res = await fetch("/api/attorney/sessions", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tool: "RESEARCH",
+          title,
+          data: { messages: msgs.map((m) => ({ id: m.id, role: m.role, content: m.content })) },
+          sessionId: sessionIdRef.current,
+        }),
+      });
+      const result = await res.json();
+      if (result.session?.id && !sessionIdRef.current) {
+        sessionIdRef.current = result.session.id;
+      }
+    } catch {
+      // Session save failed silently
+    }
+    setHistoryRefresh((n) => n + 1);
+  }, []);
+
   // Fetch follow-up suggestions when streaming ends
   useEffect(() => {
     const wasStreaming = prevStreamingRef.current;
@@ -38,6 +66,11 @@ export default function ResearchPage() {
       const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
       const lastUser = [...messages].reverse().find((m) => m.role === "user");
       if (!lastAssistant?.content || !lastUser?.content) return;
+
+      // Auto-save session after each response
+      if (!isRestoredRef.current) {
+        saveSession(messages);
+      }
 
       setSuggestions([]);
       fetch("/api/attorney/research/suggestions", {
@@ -54,7 +87,7 @@ export default function ResearchPage() {
         .then((data) => { if (data.suggestions?.length) setSuggestions(data.suggestions); })
         .catch(() => {});
     }
-  }, [isStreaming, messages]);
+  }, [isStreaming, messages, saveSession]);
 
   function handleKey(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -78,29 +111,9 @@ export default function ResearchPage() {
     sendMessage(q);
   }
 
-  const saveSession = useCallback(async (msgs: Message[]) => {
-    if (msgs.length === 0) return;
-    const firstUserMsg = msgs.find((m) => m.role === "user");
-    if (!firstUserMsg) return;
-    const title = firstUserMsg.content.slice(0, 60);
-    await fetch("/api/attorney/sessions", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tool: "RESEARCH",
-        title,
-        data: { messages: msgs.map((m) => ({ id: m.id, role: m.role, content: m.content })) },
-      }),
-    });
-    setHistoryRefresh((n) => n + 1);
-  }, []);
-
   async function handleNewSession() {
-    if (messages.length > 0 && !isRestoredRef.current) {
-      await saveSession(messages);
-    }
     isRestoredRef.current = false;
+    sessionIdRef.current = null;
     setSuggestions([]);
     reset();
   }
@@ -122,7 +135,7 @@ export default function ResearchPage() {
     URL.revokeObjectURL(url);
   }
 
-  function handleRestore(data: unknown) {
+  function handleRestore(data: unknown, sessionId?: string) {
     const d = data as { messages: { id: string; role: "user" | "assistant"; content: string }[] };
     if (d?.messages) {
       const restored: Message[] = d.messages.map((m) => ({
@@ -132,6 +145,7 @@ export default function ResearchPage() {
         createdAt: new Date(),
       }));
       isRestoredRef.current = true;
+      sessionIdRef.current = sessionId ?? null;
       setSuggestions([]);
       restoreMessages(restored);
     }

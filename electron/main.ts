@@ -143,16 +143,98 @@ ipcMain.handle("app:hardware", async () => {
 ipcMain.handle("app:checkUpdate", async () => {
   try {
     const res = await fetch(
-      "https://api.github.com/repos/ablugg/mizan-desktop/releases/latest",
-      { headers: { "User-Agent": "Mizan-Desktop" }, signal: AbortSignal.timeout(8000) }
+      "https://api.github.com/repos/ablugg/mizan-canada/releases/latest",
+      { headers: { "User-Agent": "Mizan-Canada" }, signal: AbortSignal.timeout(8000) }
     );
     if (!res.ok) return { hasUpdate: false };
-    const data = await res.json() as { tag_name?: string };
+    const data = await res.json() as { tag_name?: string; assets?: Array<{ name: string; browser_download_url: string }> };
     const latest = (data.tag_name ?? "").replace(/^v/, "");
     const current = app.getVersion();
     const hasUpdate = latest !== "" && latest !== current;
-    return { hasUpdate, latest, current, releaseUrl: `https://github.com/ablugg/mizan-desktop/releases/latest` };
+
+    // Find the right asset for this platform + arch
+    let downloadUrl = "";
+    if (hasUpdate && data.assets) {
+      const plat = process.platform;
+      const arch = process.arch;
+      if (plat === "darwin") {
+        const suffix = arch === "arm64" ? "-arm64.dmg" : ".dmg";
+        const asset = data.assets.find(a => a.name.endsWith(suffix) && (arch !== "arm64" || a.name.includes("arm64")))
+          ?? data.assets.find(a => a.name.endsWith(".dmg"));
+        if (asset) downloadUrl = asset.browser_download_url;
+      } else if (plat === "win32") {
+        const asset = data.assets.find(a => a.name.endsWith(".exe"));
+        if (asset) downloadUrl = asset.browser_download_url;
+      } else {
+        const asset = data.assets.find(a => a.name.endsWith(".AppImage") && a.name.includes(arch))
+          ?? data.assets.find(a => a.name.endsWith(".deb") && a.name.includes(arch));
+        if (asset) downloadUrl = asset.browser_download_url;
+      }
+    }
+
+    return {
+      hasUpdate,
+      latest,
+      current,
+      releaseUrl: `https://github.com/ablugg/mizan-canada/releases/latest`,
+      downloadUrl,
+    };
   } catch {
     return { hasUpdate: false };
   }
+});
+
+// --- IPC: Download and install update ---
+
+ipcMain.handle("app:downloadUpdate", async (event, downloadUrl: string) => {
+  try {
+    const fs = await import("fs");
+    const os = await import("os");
+    const p = await import("path");
+
+    const res = await fetch(downloadUrl, {
+      headers: { "User-Agent": "Mizan-Canada" },
+      signal: AbortSignal.timeout(600000),
+    });
+    if (!res.ok || !res.body) return { ok: false, error: `Download failed (${res.status})` };
+
+    const contentLength = Number(res.headers.get("content-length") ?? 0);
+    const fileName = downloadUrl.split("/").pop() ?? "update";
+    const tmpDir = os.tmpdir();
+    const filePath = p.join(tmpDir, fileName);
+    const writeStream = fs.createWriteStream(filePath);
+
+    let downloaded = 0;
+    const reader = res.body.getReader();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      writeStream.write(Buffer.from(value));
+      downloaded += value.byteLength;
+      if (!event.sender.isDestroyed() && contentLength > 0) {
+        event.sender.send("app:update-progress", {
+          downloaded,
+          total: contentLength,
+          pct: Math.round((downloaded / contentLength) * 100),
+        });
+      }
+    }
+
+    writeStream.end();
+    await new Promise<void>((resolve) => writeStream.on("finish", resolve));
+
+    return { ok: true, filePath };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg };
+  }
+});
+
+// --- IPC: Open downloaded file and quit ---
+
+ipcMain.handle("app:installUpdate", async (_event, filePath: string) => {
+  shell.openPath(filePath);
+  setTimeout(() => app.quit(), 1000);
+  return { ok: true };
 });

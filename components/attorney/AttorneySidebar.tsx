@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, FileSearch, FileText, Scissors, Menu, ChevronLeft, ChevronRight, Languages, BookOpen, CalendarClock, Sun, Moon, BarChart2, Lock, Globe, LibraryBig, Heart } from "lucide-react";
+import { Search, FileSearch, FileText, Scissors, Menu, ChevronLeft, ChevronRight, Languages, BookOpen, CalendarClock, Sun, Moon, BarChart2, Globe, LibraryBig, Heart } from "lucide-react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useJurisdiction } from "@/contexts/JurisdictionContext";
 import type { TranslationKey } from "@/lib/i18n";
@@ -27,7 +27,10 @@ export function AttorneySidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [isLight, setIsLight] = useState(false);
-  const [updateInfo, setUpdateInfo] = useState<{ latest: string; releaseUrl: string } | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<{ latest: string; releaseUrl: string; downloadUrl?: string } | null>(null);
+  const [updateState, setUpdateState] = useState<"idle" | "downloading" | "ready" | "error">("idle");
+  const [updatePct, setUpdatePct] = useState(0);
+  const [updateFilePath, setUpdateFilePath] = useState("");
   const displayName = "Attorney";
 
   // Derived accent colours from active jurisdiction
@@ -43,9 +46,9 @@ export function AttorneySidebar() {
     // Check for updates once on mount (Electron only)
     const electron = (window as unknown as { electron?: { app?: { checkUpdate?: () => Promise<{ hasUpdate: boolean; latest?: string; releaseUrl?: string }> } } }).electron;
     if (electron?.app?.checkUpdate) {
-      electron.app.checkUpdate().then((res) => {
+      electron.app.checkUpdate().then((res: { hasUpdate: boolean; latest?: string; releaseUrl?: string; downloadUrl?: string }) => {
         if (res.hasUpdate && res.latest && res.releaseUrl) {
-          setUpdateInfo({ latest: res.latest, releaseUrl: res.releaseUrl });
+          setUpdateInfo({ latest: res.latest, releaseUrl: res.releaseUrl, downloadUrl: res.downloadUrl });
         }
       }).catch(() => {});
     }
@@ -304,15 +307,6 @@ export function AttorneySidebar() {
                   <span style={{ position: "absolute", top: "-2px", right: "-2px", width: "5px", height: "5px", borderRadius: "50%", background: accentColor }} />
                 )}
               </a>
-              <button
-                title="Lock session"
-                style={{ background: "transparent", border: "none", cursor: "pointer", color: tc.logoutColor, display: "flex", alignItems: "center", transition: "color 0.15s" }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = `rgba(${accentRgb},0.7)`; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = tc.logoutColor; }}
-                onClick={() => window.dispatchEvent(new CustomEvent("attorney-lock-request"))}
-              >
-                <Lock size={13} />
-              </button>
             </div>
           ) : (
             <>
@@ -324,17 +318,6 @@ export function AttorneySidebar() {
                   <div style={{ fontSize: "9px", letterSpacing: "0.1em", color: tc.footerBadge, fontFamily: "var(--font-dm-sans)", marginTop: "1px", transition: "color 0.5s" }}>
                     {t("app.tagline.licensed")}
                   </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <button
-                    title="Lock session"
-                    style={{ background: "transparent", border: "none", cursor: "pointer", color: tc.logoutColor, display: "flex", alignItems: "center", transition: "color 0.15s" }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(201,168,76,0.7)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = tc.logoutColor; }}
-                    onClick={() => window.dispatchEvent(new CustomEvent("attorney-lock-request"))}
-                  >
-                    <Lock size={13} />
-                  </button>
                 </div>
               </div>
 
@@ -384,22 +367,58 @@ export function AttorneySidebar() {
 
               {/* Update available */}
               {updateInfo && (
-                <a
-                  href={updateInfo.releaseUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ display: "flex", alignItems: "center", gap: "7px", width: "100%", padding: "6px 8px", borderRadius: "7px", background: `rgba(${accentRgb},0.07)`, border: `1px solid rgba(${accentRgb},0.25)`, cursor: "pointer", transition: "all 0.2s", marginTop: "6px", textDecoration: "none" }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = `rgba(${accentRgb},0.12)`; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = `rgba(${accentRgb},0.07)`; }}
+                <button
+                  onClick={async () => {
+                    if (updateState === "ready" && updateFilePath) {
+                      const el = (window as unknown as { electron?: { app?: { installUpdate?: (p: string) => Promise<{ ok: boolean }> } } }).electron;
+                      el?.app?.installUpdate?.(updateFilePath);
+                      return;
+                    }
+                    if (updateState === "downloading") return;
+                    if (updateInfo.downloadUrl) {
+                      setUpdateState("downloading");
+                      setUpdatePct(0);
+                      const el = (window as unknown as { electron?: { app?: { downloadUpdate?: (url: string, onProgress: (p: { pct: number }) => void) => Promise<{ ok: boolean; filePath?: string; error?: string }> } } }).electron;
+                      if (el?.app?.downloadUpdate) {
+                        const result = await el.app.downloadUpdate(updateInfo.downloadUrl, (p) => setUpdatePct(p.pct));
+                        if (result.ok && result.filePath) {
+                          setUpdateFilePath(result.filePath);
+                          setUpdateState("ready");
+                        } else {
+                          setUpdateState("error");
+                        }
+                      } else {
+                        window.open(updateInfo.releaseUrl, "_blank");
+                      }
+                    } else {
+                      window.open(updateInfo.releaseUrl, "_blank");
+                    }
+                  }}
+                  style={{ display: "flex", alignItems: "center", gap: "7px", width: "100%", padding: "6px 8px", borderRadius: "7px", background: `rgba(${accentRgb},0.07)`, border: `1px solid rgba(${accentRgb},0.25)`, cursor: "pointer", transition: "all 0.2s", marginTop: "6px", textAlign: "left" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = `rgba(${accentRgb},0.12)`; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = `rgba(${accentRgb},0.07)`; }}
                 >
                   <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ flexShrink: 0 }}>
                     <path d="M5.5 1v7M2.5 5l3-3 3 3" stroke={accentColor} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
                     <path d="M1.5 9.5h8" stroke={accentColor} strokeWidth="1.4" strokeLinecap="round"/>
                   </svg>
-                  <span style={{ fontSize: "9px", letterSpacing: "0.12em", textTransform: "uppercase", color: `rgba(${accentRgb},0.85)`, fontFamily: "var(--font-dm-sans)" }}>
-                    {locale === "fr" ? `Mise a jour ${updateInfo.latest}` : `Update v${updateInfo.latest}`}
-                  </span>
-                </a>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: "9px", letterSpacing: "0.12em", textTransform: "uppercase", color: `rgba(${accentRgb},0.85)`, fontFamily: "var(--font-dm-sans)", display: "block" }}>
+                      {updateState === "downloading"
+                        ? (locale === "fr" ? `Telechargement ${updatePct}%` : `Downloading ${updatePct}%`)
+                        : updateState === "ready"
+                        ? (locale === "fr" ? "Installer et redemarrer" : "Install and restart")
+                        : updateState === "error"
+                        ? (locale === "fr" ? "Echec, cliquez pour reessayer" : "Failed, click to retry")
+                        : (locale === "fr" ? `Mise a jour ${updateInfo.latest}` : `Update v${updateInfo.latest}`)}
+                    </span>
+                    {updateState === "downloading" && (
+                      <div style={{ width: "100%", height: "2px", borderRadius: "1px", background: `rgba(${accentRgb},0.15)`, marginTop: "4px", overflow: "hidden" }}>
+                        <div style={{ height: "100%", borderRadius: "1px", width: `${updatePct}%`, background: accentColor, transition: "width 0.3s ease" }} />
+                      </div>
+                    )}
+                  </div>
+                </button>
               )}
 
               {/* Jurisdiction switcher — only shown when multiple jurisdictions are installed */}

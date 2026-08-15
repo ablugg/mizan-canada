@@ -16,7 +16,7 @@ interface SessionMeta {
 
 interface Props {
   tool: "RESEARCH" | "REVIEW" | "DRAFT" | "REDLINE";
-  onRestore: (data: unknown) => void;
+  onRestore: (data: unknown, sessionId?: string) => void;
   refreshTrigger?: number; // increment to force re-fetch
 }
 
@@ -64,7 +64,7 @@ export function SessionHistory({ tool, onRestore, refreshTrigger }: Props) {
       const res = await fetch(`/api/attorney/sessions/${id}`, { credentials: "include" });
       const { session } = await res.json();
       if (session) {
-        onRestore(session.data);
+        onRestore(session.data, id);
         setOpen(false);
       }
     } finally {
