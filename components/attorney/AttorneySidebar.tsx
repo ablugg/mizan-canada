@@ -471,12 +471,12 @@ export function AttorneySidebar() {
                 </button>
               )}
 
-              {/* Check for updates -- shown when idle or checking */}
-              {(updateState === "idle" || updateState === "checking" || updateState === "up-to-date") && (
+              {/* Check for updates -- shown when idle, checking, up-to-date, or error without a known version */}
+              {(updateState === "idle" || updateState === "checking" || updateState === "up-to-date" || (updateState === "error" && !updateVersion)) && (
                 <button
                   onClick={() => checkForUpdates(false)}
                   disabled={updateState === "checking"}
-                  style={{ display: "flex", alignItems: "center", gap: "7px", width: "100%", padding: "6px 8px", borderRadius: "7px", background: "transparent", border: `1px solid ${tc.toggleBorder}`, cursor: updateState === "checking" ? "default" : "pointer", transition: "all 0.2s", marginTop: "6px", textAlign: "left" }}
+                  style={{ display: "flex", alignItems: "center", gap: "7px", width: "100%", padding: "6px 8px", borderRadius: "7px", background: "transparent", border: `1px solid ${updateState === "error" ? "rgba(224,112,112,0.2)" : tc.toggleBorder}`, cursor: updateState === "checking" ? "default" : "pointer", transition: "all 0.2s", marginTop: "6px", textAlign: "left" }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = `rgba(${accentRgb},0.3)`; e.currentTarget.style.background = `rgba(${accentRgb},0.06)`; }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = tc.toggleBorder; e.currentTarget.style.background = "transparent"; }}
                 >
@@ -484,11 +484,13 @@ export function AttorneySidebar() {
                     <path d="M9.5 5.5a4 4 0 1 1-1.2-2.85" stroke={tc.toggleColor} strokeWidth="1.2" strokeLinecap="round" fill="none"/>
                     <path d="M9.5 1.5v2h-2" stroke={tc.toggleColor} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
                   </svg>
-                  <span style={{ fontSize: "9px", letterSpacing: "0.16em", textTransform: "uppercase", color: updateState === "up-to-date" ? "rgba(74,197,110,0.8)" : tc.themeLabelColor, fontFamily: "var(--font-dm-sans)", transition: "color 0.3s" }}>
+                  <span style={{ fontSize: "9px", letterSpacing: "0.16em", textTransform: "uppercase", color: updateState === "up-to-date" ? "rgba(74,197,110,0.8)" : updateState === "error" ? "rgba(224,112,112,0.7)" : tc.themeLabelColor, fontFamily: "var(--font-dm-sans)", transition: "color 0.3s" }}>
                     {updateState === "checking"
                       ? (locale === "fr" ? "Verification..." : "Checking...")
                       : updateState === "up-to-date"
                       ? (locale === "fr" ? "A jour" : "Up to date")
+                      : updateState === "error"
+                      ? (locale === "fr" ? "Reessayer" : "Retry")
                       : (locale === "fr" ? "Verifier les mises a jour" : "Check for updates")}
                   </span>
                 </button>
