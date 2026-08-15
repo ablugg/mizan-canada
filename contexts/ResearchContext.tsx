@@ -73,6 +73,8 @@ export function ResearchProvider({ children }: { children: React.ReactNode }) {
       let accumulated = "";
       let displayed = "";
       let animating = false;
+      let streamDone = false;
+      let resolveAnimation: (() => void) | null = null;
 
       function animateNext() {
         if (displayed.length >= accumulated.length) {
@@ -80,6 +82,8 @@ export function ResearchProvider({ children }: { children: React.ReactNode }) {
           setMessages((prev) =>
             prev.map((m) => (m.id === aiId ? { ...m, content: accumulated } : m))
           );
+          // If stream is done and animation caught up, resolve the wait
+          if (streamDone && resolveAnimation) resolveAnimation();
           return;
         }
         displayed += accumulated.slice(displayed.length, displayed.length + 4);
@@ -101,6 +105,17 @@ export function ResearchProvider({ children }: { children: React.ReactNode }) {
           animating = true;
           requestAnimationFrame(animateNext);
         }
+      }
+
+      // Wait for animation to finish flushing all content before marking done
+      streamDone = true;
+      if (animating) {
+        await new Promise<void>((resolve) => { resolveAnimation = resolve; });
+      } else {
+        // Animation already caught up, set final content
+        setMessages((prev) =>
+          prev.map((m) => (m.id === aiId ? { ...m, content: accumulated } : m))
+        );
       }
     } catch (err) {
       if (err instanceof Error && err.name !== "AbortError") {

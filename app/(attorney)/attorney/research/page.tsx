@@ -67,9 +67,9 @@ export default function ResearchPage() {
       const lastUser = [...messages].reverse().find((m) => m.role === "user");
       if (!lastAssistant?.content || !lastUser?.content) return;
 
-      // Auto-save session after each response
+      // Auto-save session after each response (short delay to ensure final content is flushed)
       if (!isRestoredRef.current) {
-        saveSession(messages);
+        setTimeout(() => saveSession(messages), 100);
       }
 
       setSuggestions([]);

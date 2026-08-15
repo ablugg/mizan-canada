@@ -4,14 +4,15 @@ import path from "path";
 // In Electron production the DATABASE_URL is injected by the main process.
 // In dev it falls back to a local SQLite file.
 function getDatabaseUrl(): string {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  const envUrl = process.env.DATABASE_URL;
+  // Only accept file: URLs (SQLite) -- ignore any cloud DB URLs from other forks
+  if (envUrl && envUrl.startsWith("file:")) return envUrl;
   const dbPath = path.join(process.cwd(), "mizan-dev.db");
   return `file:${dbPath}`;
 }
 
-if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = getDatabaseUrl();
-}
+// Always set DATABASE_URL to ensure Prisma uses local SQLite
+process.env.DATABASE_URL = getDatabaseUrl();
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
