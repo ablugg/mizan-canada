@@ -8,9 +8,15 @@ directories:
 
 asar: true
 asarUnpack:
-  - "node_modules/.prisma/**/*"
-  - "node_modules/@prisma/engines/**/*"
+  - "electron/dist/**/*"
+  - ".next/standalone/**/*"
+  - ".next/static/**/*"
+  - "public/**/*"
   - "prisma/**/*"
+  - "node_modules/.prisma/**/*"
+  - "node_modules/@prisma/client/**/*"
+  - "node_modules/prisma/**/*"
+  - "node_modules/@prisma/engines/**/*"
 
 files:
   - "electron/dist/**/*"
