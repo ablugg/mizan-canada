@@ -31,6 +31,10 @@ jobs:
           echo "${{ secrets.ENV_APP }}" > .env.app
         shell: bash
 
+      - name: Create empty vector-store directory
+        run: mkdir -p data/vector-store
+        shell: bash
+
       - name: Download Ollama (Windows)
         run: npx tsx scripts/download-ollama.ts
 

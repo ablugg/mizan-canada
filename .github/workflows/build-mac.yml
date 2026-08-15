@@ -28,6 +28,9 @@ jobs:
       - name: Create .env.app from secret
         run: echo "${{ secrets.ENV_APP }}" > .env.app
 
+      - name: Create empty vector-store directory
+        run: mkdir -p data/vector-store
+
       - name: Download Ollama (macOS)
         run: npx tsx scripts/download-ollama.ts
 
@@ -35,13 +38,9 @@ jobs:
         run: npm run electron:build -- --mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ secrets.MAC_CERTIFICATE }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Rename artifacts (spaces → hyphens)
+      - name: Rename artifacts (spaces to hyphens)
         run: |
           cd dist-electron
           for f in Mizan\ Canada-*; do
