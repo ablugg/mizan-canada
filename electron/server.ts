@@ -95,6 +95,10 @@ export async function startNextServer(): Promise<number> {
 
   const envFileVars = loadEnvFile();
 
+  // Ensure BRIDGE_SECRET is always set so session encryption is consistent
+  const bridgeSecret =
+    envFileVars.BRIDGE_SECRET || process.env.BRIDGE_SECRET || "dev-fallback-insecure";
+
   serverProcess = utilityProcess.fork(serverScript, [], {
     env: {
       ...envFileVars,
@@ -105,6 +109,7 @@ export async function startNextServer(): Promise<number> {
       DATABASE_URL: `file:${path.join(userData, "mizan.db")}`,
       VECTOR_DB_PATH: path.join(process.resourcesPath, "vector-store"),
       OLLAMA_HOST: "http://127.0.0.1:11434",
+      BRIDGE_SECRET: bridgeSecret,
     },
     stdio: "pipe",
   });

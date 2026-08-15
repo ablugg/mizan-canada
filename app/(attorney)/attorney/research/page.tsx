@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState, useCallback } from "react";
-import { Square, RotateCcw, Send, FileDown } from "lucide-react";
+import { Square, RotateCcw, Send, FileDown, Save, Check, AlertCircle } from "lucide-react";
 import { useResearch } from "@/contexts/ResearchContext";
 import { SessionHistory } from "@/components/attorney/SessionHistory";
 import { Message } from "@/types";
@@ -16,6 +16,7 @@ export default function ResearchPage() {
   const messageElRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const prevStreamingRef = useRef(false);
   const isRestoredRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
@@ -109,6 +110,19 @@ export default function ResearchPage() {
     sendMessage(q);
   }
 
+  async function handleManualSave() {
+    if (messages.length === 0 || saveState === "saving") return;
+    setSaveState("saving");
+    try {
+      await saveSession(messages);
+      setSaveState("saved");
+      setTimeout(() => setSaveState("idle"), 2000);
+    } catch {
+      setSaveState("error");
+      setTimeout(() => setSaveState("idle"), 2500);
+    }
+  }
+
   async function handleNewSession() {
     // Save current session before clearing
     if (messages.length >= 2) {
@@ -174,6 +188,24 @@ export default function ResearchPage() {
           {messages.length > 0 && (
             <>
               <button
+                onClick={handleManualSave}
+                disabled={saveState === "saving"}
+                style={{
+                  display: "flex", alignItems: "center", gap: "6px", padding: "6px 12px",
+                  borderRadius: "8px", background: "transparent",
+                  border: `1px solid ${saveState === "saved" ? "rgba(80,200,120,0.4)" : saveState === "error" ? "rgba(200,80,80,0.4)" : "rgba(201,168,76,0.25)"}`,
+                  color: saveState === "saved" ? "rgba(80,200,120,0.9)" : saveState === "error" ? "rgba(200,80,80,0.9)" : "rgba(201,168,76,0.8)",
+                  cursor: saveState === "saving" ? "wait" : "pointer",
+                  fontSize: "11px", fontFamily: "var(--font-dm-sans)", transition: "all 0.15s",
+                  opacity: saveState === "saving" ? 0.6 : 1,
+                }}
+                onMouseEnter={(e) => { if (saveState === "idle") { e.currentTarget.style.borderColor = "rgba(201,168,76,0.5)"; e.currentTarget.style.color = "#c9a84c"; } }}
+                onMouseLeave={(e) => { if (saveState === "idle") { e.currentTarget.style.borderColor = "rgba(201,168,76,0.25)"; e.currentTarget.style.color = "rgba(201,168,76,0.8)"; } }}
+              >
+                {saveState === "saved" ? <Check size={11} /> : saveState === "error" ? <AlertCircle size={11} /> : <Save size={11} />}
+                {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : saveState === "error" ? "Failed" : "Save"}
+              </button>
+              <button
                 onClick={exportTranscript}
                 style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 12px", borderRadius: "8px", background: "transparent", border: "1px solid rgba(201,168,76,0.25)", color: "rgba(201,168,76,0.8)", cursor: "pointer", fontSize: "11px", fontFamily: "var(--font-dm-sans)", transition: "all 0.15s" }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(201,168,76,0.5)"; e.currentTarget.style.color = "#c9a84c"; }}
@@ -237,7 +269,7 @@ export default function ResearchPage() {
                       ) : (
                         <div className="research-md" style={{ borderLeft: "1.5px solid rgba(201,168,76,0.22)", paddingLeft: "16px", wordBreak: "break-word" }}>
                           {msg.content ? (
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a> }}>{msg.content}</ReactMarkdown>
                           ) : (
                             isStreaming ? <span style={{ color: "rgba(201,168,76,0.6)" }}>Researching…</span> : null
                           )}

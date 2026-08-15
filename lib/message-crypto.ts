@@ -9,7 +9,7 @@ let cachedKey: Buffer | null = null;
 
 function getKey(): Buffer {
   if (cachedKey) return cachedKey;
-  const secret = process.env.BRIDGE_SECRET ?? "dev-fallback-insecure";
+  const secret = process.env.BRIDGE_SECRET || "dev-fallback-insecure";
   // SHA-256 is fast (no event-loop block) and sufficient — BRIDGE_SECRET is already high-entropy.
   cachedKey = crypto.createHash("sha256").update(secret).update("mizan-msg-v1").digest();
   return cachedKey;

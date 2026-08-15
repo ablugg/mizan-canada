@@ -59,6 +59,16 @@ function createWindow(port: number) {
     return { action: "deny" };
   });
 
+  // Intercept all in-page navigation so external links open in the default
+  // browser instead of navigating the Electron window away from the app.
+  mainWindow.webContents.on("will-navigate", (e, url) => {
+    const appOrigin = `http://127.0.0.1:${port}`;
+    if (!url.startsWith(appOrigin)) {
+      e.preventDefault();
+      shell.openExternal(url);
+    }
+  });
+
   mainWindow.on("closed", () => {
     mainWindow = null;
   });

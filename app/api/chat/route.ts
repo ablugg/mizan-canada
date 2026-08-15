@@ -13,6 +13,54 @@ export async function POST(req: NextRequest) {
 
   const hasDocuments = !!documentIds?.length;
 
+  // Search past research sessions for relevant context
+  const sessionContext = await (async () => {
+    try {
+      const sessions = await db.attorneySession.findMany({
+        where: { userId: LOCAL_USER_ID, tool: "RESEARCH" },
+        orderBy: { updatedAt: "desc" },
+        select: { data: true },
+        take: 20,
+      });
+      const keywords = lastUserMessage
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 3);
+      if (keywords.length === 0) return "";
+
+      const relevant: string[] = [];
+      for (const s of sessions) {
+        try {
+          const parsed = JSON.parse(s.data);
+          let data: { messages?: { role: string; content: string }[] };
+          if (parsed && typeof parsed === "object" && "__enc" in parsed) {
+            data = JSON.parse(decryptMessage(parsed.__enc));
+          } else {
+            data = parsed;
+          }
+          if (!data?.messages) continue;
+          const text = data.messages.map((m) => m.content).join(" ").toLowerCase();
+          const matchCount = keywords.filter((k) => text.includes(k)).length;
+          if (matchCount >= Math.max(2, Math.ceil(keywords.length * 0.3))) {
+            const pairs = data.messages
+              .filter((m) => m.role === "assistant" && m.content.length > 50)
+              .map((m) => m.content.slice(0, 400));
+            if (pairs.length > 0) relevant.push(pairs[0]);
+          }
+        } catch {
+          continue;
+        }
+        if (relevant.length >= 3) break;
+      }
+      if (relevant.length === 0) return "";
+      return "Relevant findings from prior research sessions:\n" +
+        relevant.map((r, i) => `[Session ${i + 1}] ${r}`).join("\n\n");
+    } catch (e) {
+      console.error("[chat] Session context retrieval failed:", e);
+      return "";
+    }
+  })();
+
   const [context, documentContext] = await Promise.all([
     hasDocuments
       ? Promise.resolve("")
@@ -66,6 +114,7 @@ export async function POST(req: NextRequest) {
       : "IMPORTANT: You must respond exclusively in English, regardless of the language used by the user. Do not use French, Chinese, or any other language in your response.",
     context ? `Relevant legal context:\n${context}` : null,
     documentContext ? `Uploaded documents for review:\n${documentContext}` : null,
+    sessionContext || null,
   ]
     .filter(Boolean)
     .join("\n\n");
