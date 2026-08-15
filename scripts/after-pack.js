@@ -18,62 +18,48 @@ function copyDirSync(src, dest) {
 /**
  * after-pack hook: runs after electron-builder packages the app but before DMG/NSIS creation.
  *
- * Fixes two issues electron-builder causes by default:
- * 1. Dotfolders (e.g. .prisma) are excluded from the packaged app by electron-builder's
- *    glob engine. We manually copy the Prisma query engine binary here.
- * 2. The bundled Ollama binary needs +x on macOS/Linux.
+ * 1. Injects .prisma/client (query engine) which dotfile rules may exclude.
+ * 2. Sets +x on bundled Ollama binaries for macOS/Linux.
  */
 exports.default = async function afterPack(context) {
   const { appOutDir, electronPlatformName } = context;
 
-  // Resolve the inner app directory (where node_modules lives at runtime)
-  let appDir;
+  let resourcesDir;
   if (electronPlatformName === "darwin") {
-    // Find the .app bundle inside appOutDir
     const entry = fs.readdirSync(appOutDir).find((f) => f.endsWith(".app"));
     if (!entry) {
       console.warn("  [after-pack] Could not find .app bundle in", appOutDir);
       return;
     }
-    appDir = path.join(appOutDir, entry, "Contents", "Resources", "app");
+    resourcesDir = path.join(appOutDir, entry, "Contents", "Resources");
   } else {
-    appDir = path.join(appOutDir, "resources", "app");
+    resourcesDir = path.join(appOutDir, "resources");
   }
 
-  // 1. Inject .prisma/client (Prisma query engine) — excluded by electron-builder dotfile rules
+  // 1. Inject .prisma/client into the unpacked area (asar or plain)
   const srcPrisma = path.join(__dirname, "..", "node_modules", ".prisma");
-  const destPrisma = path.join(appDir, "node_modules", ".prisma");
+  // With asar enabled, unpacked files go to app.asar.unpacked/; without asar, app/
+  const unpackedDir = path.join(resourcesDir, "app.asar.unpacked");
+  const plainDir = path.join(resourcesDir, "app");
+  const destBase = fs.existsSync(unpackedDir) ? unpackedDir : plainDir;
+  const destPrisma = path.join(destBase, "node_modules", ".prisma");
   if (fs.existsSync(srcPrisma)) {
     copyDirSync(srcPrisma, destPrisma);
-    console.log("  • injected .prisma/client into packaged app");
+    console.log("  \u2022 injected .prisma/client into packaged app");
   } else {
     console.warn("  [after-pack] .prisma not found at", srcPrisma);
   }
 
-  // 2. Make the bundled Ollama binary and its helpers executable on macOS/Linux
+  // 2. Make the bundled Ollama binary executable on macOS/Linux
   if (electronPlatformName !== "win32") {
-    // On macOS, extraResources land inside the .app bundle's Contents/Resources/
-    // On Linux, they land in [appOutDir]/resources/
-    let resourcesDir;
-    if (electronPlatformName === "darwin") {
-      const appEntry = fs.readdirSync(appOutDir).find((f) => f.endsWith(".app"));
-      resourcesDir = appEntry
-        ? path.join(appOutDir, appEntry, "Contents", "Resources")
-        : null;
-    } else {
-      resourcesDir = path.join(appOutDir, "resources");
-    }
-
-    if (resourcesDir) {
-      const ollamaDir = path.join(resourcesDir, "ollama", "mac");
-      if (fs.existsSync(ollamaDir)) {
-        for (const entry of fs.readdirSync(ollamaDir, { withFileTypes: true })) {
-          if (entry.isFile()) {
-            fs.chmodSync(path.join(ollamaDir, entry.name), 0o755);
-          }
+    const ollamaDir = path.join(resourcesDir, "ollama", "mac");
+    if (fs.existsSync(ollamaDir)) {
+      for (const entry of fs.readdirSync(ollamaDir, { withFileTypes: true })) {
+        if (entry.isFile()) {
+          fs.chmodSync(path.join(ollamaDir, entry.name), 0o755);
         }
-        console.log("  • set ollama/mac/* +x");
       }
+      console.log("  \u2022 set ollama/mac/* +x");
     }
   }
 };

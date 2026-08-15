@@ -6,18 +6,22 @@ directories:
   output: dist-electron
   buildResources: build
 
-asar: false
+asar: true
+asarUnpack:
+  - "node_modules/.prisma/**/*"
+  - "node_modules/@prisma/engines/**/*"
+  - "prisma/**/*"
 
 files:
   - "electron/dist/**/*"
   - ".next/standalone/**/*"
+  - "!.next/standalone/data/**/*"
   - ".next/static/**/*"
   - "public/**/*"
   - "prisma/**/*"
   - "node_modules/.prisma/**/*"
   - "node_modules/@prisma/client/**/*"
   - "node_modules/prisma/**/*"
-  - "node_modules/@prisma/migrate/**/*"
   - "node_modules/@prisma/engines/**/*"
 
 extraResources:
