@@ -87,10 +87,7 @@ export async function startNextServer(): Promise<number> {
   }
 
   const port = await getAvailablePort();
-  // With asar enabled, app.getAppPath() returns "app.asar" but the standalone
-  // server is unpacked to "app.asar.unpacked/" so utilityProcess.fork() works.
-  const appPath = app.getAppPath().replace(/app\.asar$/, "app.asar.unpacked");
-  const serverScript = path.join(appPath, ".next/standalone/server.js");
+  const serverScript = path.join(app.getAppPath(), ".next/standalone/server.js");
   const userData = app.getPath("userData");
 
   // Ensure database exists on first launch
