@@ -55,6 +55,8 @@ export class OllamaManager {
         ...process.env,
         OLLAMA_MODELS: modelsDir,
         OLLAMA_HOST: "127.0.0.1:11434",
+        OLLAMA_KEEP_ALIVE: "-1", // keep model in GPU memory indefinitely
+        OLLAMA_NUM_PARALLEL: "2", // allow parallel requests (suggestions + chat)
       },
       stdio: "ignore",
       detached: false,

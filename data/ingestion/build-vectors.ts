@@ -256,7 +256,11 @@ export async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Only run when executed directly (not when imported)
+const isDirectRun = process.argv[1]?.includes("build-vectors");
+if (isDirectRun) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

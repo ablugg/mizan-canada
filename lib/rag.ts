@@ -13,6 +13,9 @@ const USER_TABLE_NAME = "user_chunks";
 // Per-jurisdiction connection caches
 const connectionCaches: Record<string, unknown> = {};
 
+// Track whether we've attempted to create an index
+let indexEnsured = false;
+
 export function resetConnection(jurisdiction = "ca") {
   delete connectionCaches[jurisdiction];
 }
@@ -34,11 +37,30 @@ async function getConnection(jurisdiction = "ca") {
   return connectionCaches[jurisdiction] as Awaited<ReturnType<(typeof import("@lancedb/lancedb"))["connect"]>>;
 }
 
+// LRU embedding cache: avoids re-embedding identical or very similar queries
+const embeddingCache = new Map<string, { embedding: number[]; ts: number }>();
+const CACHE_MAX = 50;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 async function embed(text: string): Promise<number[]> {
+  const key = text.trim().toLowerCase().slice(0, 200);
+  const cached = embeddingCache.get(key);
+  if (cached && Date.now() - cached.ts < CACHE_TTL) {
+    return cached.embedding;
+  }
+
   const response = await getOllama().embeddings({
     model: EMBEDDING_MODEL,
     prompt: text,
   });
+
+  // Evict oldest if cache is full
+  if (embeddingCache.size >= CACHE_MAX) {
+    const oldest = [...embeddingCache.entries()].sort((a, b) => a[1].ts - b[1].ts)[0];
+    if (oldest) embeddingCache.delete(oldest[0]);
+  }
+  embeddingCache.set(key, { embedding: response.embedding, ts: Date.now() });
+
   return response.embedding;
 }
 
@@ -63,6 +85,25 @@ export async function retrieveContext(
   async function searchTable(tableName: string): Promise<LegalChunk[]> {
     try {
       const table = await db.openTable(tableName);
+
+      // Create IVF_PQ index on first search if table is large enough
+      if (!indexEnsured && tableName === TABLE_NAME) {
+        indexEnsured = true;
+        try {
+          const count = await table.countRows();
+          if (count > 10000) {
+            const indices = await table.listIndices();
+            if (!indices.some((idx: { columns?: string[] }) => idx.columns?.includes("vector"))) {
+              console.log(`[rag] Building IVF_PQ index on ${count} rows...`);
+              await table.createIndex("vector");
+              console.log("[rag] Index built.");
+            }
+          }
+        } catch (e) {
+          console.error("[rag] Index creation skipped:", e);
+        }
+      }
+
       return await table.search(queryEmbedding).limit(topK).toArray() as LegalChunk[];
     } catch {
       return [];

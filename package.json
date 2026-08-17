@@ -1,6 +1,6 @@
 {
   "name": "mizan-canada",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "main": "electron/dist/main.js",
   "scripts": {
@@ -11,6 +11,7 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "build:vectors": "tsx data/ingestion/build-vectors.ts",
+    "ingest:provincial": "tsx data/ingestion/ingest-provincial.ts",
     "download:ollama": "tsx scripts/download-ollama.ts",
     "electron:compile": "tsc --project electron/tsconfig.json",
     "electron:dev": "npm run electron:compile && concurrently \"next dev -p 3100\" \"wait-on http://localhost:3100 && NODE_ENV=development electron .\"",

@@ -19,6 +19,22 @@ function readSelectedModel(): string {
 
 export const DEFAULT_MODEL = readSelectedModel();
 
+// Lighter model for non-critical tasks (suggestions, titles, clause checks).
+// Falls back to the main model if the light model isn't available.
+function readLightModel(): string {
+  try {
+    const configPath = path.join(process.cwd(), "data", "model-config.json");
+    const raw = fs.readFileSync(configPath, "utf-8");
+    const config = JSON.parse(raw) as { lightModel?: string };
+    if (config.lightModel) return config.lightModel;
+  } catch {
+    // use default
+  }
+  return process.env.OLLAMA_LIGHT_MODEL ?? "qwen2.5:3b";
+}
+
+export const LIGHT_MODEL = readLightModel();
+
 export function getOllama() {
   return new Ollama({ host: OLLAMA_HOST });
 }
@@ -123,21 +139,46 @@ export async function chatWithSystem(
   return response.message.content;
 }
 
+// Lighter/faster version for non-critical tasks (suggestions, titles)
+export async function chatWithSystemLight(
+  systemPrompt: string,
+  userContent: string
+): Promise<string> {
+  try {
+    const response = await getOllama().chat({
+      model: LIGHT_MODEL,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
+      options: { ...INFERENCE_OPTIONS, num_ctx: 2048 },
+    });
+    return response.message.content;
+  } catch {
+    // Fall back to main model if light model not available
+    return chatWithSystem(systemPrompt, userContent);
+  }
+}
+
 export async function generateTitle(
   userMessage: string,
   assistantResponse: string
 ): Promise<string> {
-  const response = await getOllama().chat({
-    model: DEFAULT_MODEL,
-    messages: [
-      {
-        role: "user",
-        content: `Generate a concise 4-8 word title that captures the legal topic of this conversation. Return only the title, no punctuation at the end.\n\nUser asked: ${userMessage.slice(0, 300)}\n\nAssistant discussed: ${assistantResponse.slice(0, 300)}`,
-      },
-    ],
-    options: INFERENCE_OPTIONS,
-  });
-  return response.message.content.trim() || userMessage.slice(0, 60);
+  try {
+    const response = await getOllama().chat({
+      model: LIGHT_MODEL,
+      messages: [
+        {
+          role: "user",
+          content: `Generate a concise 4-8 word title that captures the legal topic of this conversation. Return only the title, no punctuation at the end.\n\nUser asked: ${userMessage.slice(0, 300)}\n\nAssistant discussed: ${assistantResponse.slice(0, 300)}`,
+        },
+      ],
+      options: { ...INFERENCE_OPTIONS, num_ctx: 2048 },
+    });
+    return response.message.content.trim() || userMessage.slice(0, 60);
+  } catch {
+    return userMessage.slice(0, 60);
+  }
 }
 
 // ── Jurisdiction-aware prompt selectors ──────────────────────────────────────

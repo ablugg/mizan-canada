@@ -13,71 +13,68 @@ export async function POST(req: NextRequest) {
 
   const hasDocuments = !!documentIds?.length;
 
-  // Pull recent research sessions so the AI has memory across conversations.
-  // Always include the 5 most recent sessions (condensed), plus any older ones
-  // that are keyword-relevant to the current question.
-  const sessionContext = await (async () => {
-    try {
-      const sessions = await db.attorneySession.findMany({
-        where: { userId: LOCAL_USER_ID, tool: "RESEARCH" },
-        orderBy: { updatedAt: "desc" },
-        select: { data: true },
-        take: 15,
-      });
-      if (sessions.length === 0) return "";
+  // Run session context, RAG retrieval, and document loading all in parallel
+  const [sessionContext, context, documentContext] = await Promise.all([
+    // Session memory
+    (async () => {
+      try {
+        const sessions = await db.attorneySession.findMany({
+          where: { userId: LOCAL_USER_ID, tool: "RESEARCH" },
+          orderBy: { updatedAt: "desc" },
+          select: { data: true },
+          take: 15,
+        });
+        if (sessions.length === 0) return "";
 
-      const keywords = lastUserMessage
-        .toLowerCase()
-        .split(/\s+/)
-        .filter((w) => w.length > 3);
+        const keywords = lastUserMessage
+          .toLowerCase()
+          .split(/\s+/)
+          .filter((w) => w.length > 3);
 
-      const summaries: string[] = [];
-      for (let i = 0; i < sessions.length; i++) {
-        try {
-          const parsed = JSON.parse(sessions[i].data);
-          let data: { messages?: { role: string; content: string }[] };
-          if (parsed && typeof parsed === "object" && "__enc" in parsed) {
-            data = JSON.parse(decryptMessage(parsed.__enc));
-          } else {
-            data = parsed;
-          }
-          if (!data?.messages || data.messages.length === 0) continue;
+        const summaries: string[] = [];
+        for (let i = 0; i < sessions.length; i++) {
+          try {
+            const parsed = JSON.parse(sessions[i].data);
+            let data: { messages?: { role: string; content: string }[] };
+            if (parsed && typeof parsed === "object" && "__enc" in parsed) {
+              data = JSON.parse(decryptMessage(parsed.__enc));
+            } else {
+              data = parsed;
+            }
+            if (!data?.messages || data.messages.length === 0) continue;
 
-          // Always include the 5 most recent sessions
-          if (i < 5) {
-            const pairs = data.messages
-              .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.slice(0, 200)}`)
-              .slice(0, 4);
-            summaries.push(pairs.join("\n"));
+            if (i < 5) {
+              const pairs = data.messages
+                .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.slice(0, 200)}`)
+                .slice(0, 4);
+              summaries.push(pairs.join("\n"));
+              continue;
+            }
+
+            if (keywords.length > 0) {
+              const text = data.messages.map((m) => m.content).join(" ").toLowerCase();
+              const matchCount = keywords.filter((k) => text.includes(k)).length;
+              if (matchCount >= 1) {
+                const pairs = data.messages
+                  .filter((m) => m.role === "assistant" && m.content.length > 30)
+                  .map((m) => m.content.slice(0, 300));
+                if (pairs.length > 0) summaries.push(pairs[0]);
+              }
+            }
+          } catch {
             continue;
           }
-
-          // For older sessions, only include if keyword-relevant
-          if (keywords.length > 0) {
-            const text = data.messages.map((m) => m.content).join(" ").toLowerCase();
-            const matchCount = keywords.filter((k) => text.includes(k)).length;
-            if (matchCount >= 1) {
-              const pairs = data.messages
-                .filter((m) => m.role === "assistant" && m.content.length > 30)
-                .map((m) => m.content.slice(0, 300));
-              if (pairs.length > 0) summaries.push(pairs[0]);
-            }
-          }
-        } catch {
-          continue;
+          if (summaries.length >= 8) break;
         }
-        if (summaries.length >= 8) break;
+        if (summaries.length === 0) return "";
+        return "The user's prior research sessions (use these for continuity and memory):\n\n" +
+          summaries.map((s, i) => `--- Session ${i + 1} ---\n${s}`).join("\n\n");
+      } catch (e) {
+        console.error("[chat] Session context retrieval failed:", e);
+        return "";
       }
-      if (summaries.length === 0) return "";
-      return "The user's prior research sessions (use these for continuity and memory):\n\n" +
-        summaries.map((s, i) => `--- Session ${i + 1} ---\n${s}`).join("\n\n");
-    } catch (e) {
-      console.error("[chat] Session context retrieval failed:", e);
-      return "";
-    }
-  })();
-
-  const [context, documentContext] = await Promise.all([
+    })(),
+    // RAG retrieval
     hasDocuments
       ? Promise.resolve("")
       : retrieveContext(lastUserMessage).then((ctx) => {
