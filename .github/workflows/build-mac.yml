@@ -28,8 +28,13 @@ jobs:
       - name: Create .env.app from secret
         run: echo "${{ secrets.ENV_APP }}" > .env.app
 
-      - name: Create empty vector-store directory
-        run: mkdir -p data/vector-store
+      - name: Download pre-built vector store
+        run: |
+          gh release download data-v1 --repo ablugg/mizan-canada --pattern "vector-store.zip" --dir /tmp
+          unzip -q /tmp/vector-store.zip -d .
+          echo "Vector store size: $(du -sh data/vector-store/)"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download Ollama (macOS)
         run: npx tsx scripts/download-ollama.ts

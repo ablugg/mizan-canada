@@ -31,9 +31,13 @@ jobs:
           echo "${{ secrets.ENV_APP }}" > .env.app
         shell: bash
 
-      - name: Create empty vector-store directory
-        run: mkdir -p data/vector-store
-        shell: bash
+      - name: Download pre-built vector store
+        run: |
+          gh release download data-v1 --repo ablugg/mizan-canada --pattern "vector-store.zip" --dir $env:TEMP
+          Expand-Archive -Path "$env:TEMP\vector-store.zip" -DestinationPath . -Force
+          Write-Host "Vector store downloaded"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download Ollama (Windows)
         run: npx tsx scripts/download-ollama.ts
