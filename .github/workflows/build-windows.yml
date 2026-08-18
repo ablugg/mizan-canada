@@ -43,7 +43,7 @@ jobs:
         run: npx tsx scripts/download-ollama.ts
 
       - name: Build
-        run: npm run electron:build -- --win
+        run: npm run electron:build -- --win --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -62,6 +62,7 @@ win:
       arch:
         - x64
   publisherName: Mizan
+  signDlls: false
   extraResources:
     - from: "resources/ollama/win/"
       to: "ollama/win/"
@@ -72,6 +73,8 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
+  unicode: true
+  differentialPackage: false
 
 linux:
   icon: build/icon.png
