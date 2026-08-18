@@ -66,6 +66,79 @@ function loadEnvFile(): Record<string, string> {
   return result;
 }
 
+async function ensureVectorStore(): Promise<string> {
+  // Check if bundled vector store has data
+  const bundledPath = path.join(process.resourcesPath, "vector-store");
+  const bundledTable = path.join(bundledPath, "legal_chunks.lance");
+  if (fs.existsSync(bundledTable)) {
+    console.log("[vectors] Using bundled vector store.");
+    return bundledPath;
+  }
+
+  // Fall back to userData location (downloaded on first launch)
+  const userPath = path.join(app.getPath("userData"), "vector-store");
+  const userTable = path.join(userPath, "legal_chunks.lance");
+  if (fs.existsSync(userTable)) {
+    console.log("[vectors] Using downloaded vector store.");
+    return userPath;
+  }
+
+  // Download from GitHub
+  console.log("[vectors] Vector store not found. Downloading...");
+  try {
+    const https = await import("https");
+    const url = "https://github.com/ablugg/mizan-canada/releases/download/data-v1/vector-store.zip";
+    const zipPath = path.join(app.getPath("temp"), "vector-store.zip");
+
+    await new Promise<void>((resolve, reject) => {
+      function download(downloadUrl: string) {
+        https.get(downloadUrl, (res) => {
+          if (res.statusCode === 302 || res.statusCode === 301) {
+            download(res.headers.location!);
+            return;
+          }
+          if (res.statusCode !== 200) {
+            reject(new Error(`Download failed: ${res.statusCode}`));
+            return;
+          }
+          const file = fs.createWriteStream(zipPath);
+          res.pipe(file);
+          file.on("finish", () => { file.close(); resolve(); });
+          file.on("error", reject);
+        }).on("error", reject);
+      }
+      download(url);
+    });
+
+    // Extract zip
+    console.log("[vectors] Extracting...");
+    const { execSync } = await import("child_process");
+    fs.mkdirSync(userPath, { recursive: true });
+    if (process.platform === "win32") {
+      execSync(`powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${app.getPath("userData")}' -Force"`, { timeout: 300000 });
+    } else {
+      execSync(`unzip -qo "${zipPath}" -d "${app.getPath("userData")}"`, { timeout: 300000 });
+    }
+
+    // Clean up zip
+    try { fs.unlinkSync(zipPath); } catch {}
+
+    // The zip extracts to data/vector-store/, move it up
+    const extractedPath = path.join(app.getPath("userData"), "data", "vector-store");
+    if (fs.existsSync(extractedPath) && !fs.existsSync(userTable)) {
+      fs.renameSync(extractedPath, userPath);
+      try { fs.rmdirSync(path.join(app.getPath("userData"), "data")); } catch {}
+    }
+
+    console.log("[vectors] Vector store downloaded and extracted.");
+    return userPath;
+  } catch (err) {
+    console.error("[vectors] Download failed:", err);
+    // Return bundled path even if empty; app will work without RAG
+    return bundledPath;
+  }
+}
+
 function ensureDatabase(userData: string): void {
   const dbPath = path.join(userData, "mizan.db");
   if (fs.existsSync(dbPath)) return;
@@ -93,6 +166,9 @@ export async function startNextServer(): Promise<number> {
   // Ensure database exists on first launch
   ensureDatabase(userData);
 
+  // Resolve vector store (bundled or downloaded)
+  const vectorDbPath = await ensureVectorStore();
+
   const envFileVars = loadEnvFile();
 
   // Ensure BRIDGE_SECRET is always set so session encryption is consistent
@@ -107,7 +183,7 @@ export async function startNextServer(): Promise<number> {
       HOSTNAME: "127.0.0.1",
       NODE_ENV: "production",
       DATABASE_URL: `file:${path.join(userData, "mizan.db")}`,
-      VECTOR_DB_PATH: path.join(process.resourcesPath, "vector-store"),
+      VECTOR_DB_PATH: vectorDbPath,
       OLLAMA_HOST: "http://127.0.0.1:11434",
       BRIDGE_SECRET: bridgeSecret,
     },
