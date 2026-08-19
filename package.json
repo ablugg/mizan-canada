@@ -12,6 +12,7 @@
     "db:studio": "prisma studio",
     "build:vectors": "tsx data/ingestion/build-vectors.ts",
     "ingest:provincial": "tsx data/ingestion/ingest-provincial.ts",
+    "ingest:cases": "tsx data/ingestion/ingest-cases.ts",
     "download:ollama": "tsx scripts/download-ollama.ts",
     "electron:compile": "tsc --project electron/tsconfig.json",
     "electron:dev": "npm run electron:compile && concurrently \"next dev -p 3100\" \"wait-on http://localhost:3100 && NODE_ENV=development electron .\"",

@@ -421,6 +421,23 @@ export default function SetupPage() {
   function downloadMainModel() { pullModel(defaultModel, setMainModel, pullingMain); }
   function downloadEmbedModel() { pullModel(embeddingModel, setEmbedModel, pullingEmbed); }
 
+  // Silently pull the light model (qwen2.5:3b) in the background after main model is ready.
+  // This enables faster suggestions and title generation without user interaction.
+  const lightPulled = useRef(false);
+  useEffect(() => {
+    if (mainModel.status === "done" && !lightPulled.current) {
+      lightPulled.current = true;
+      const lightModel = "qwen2.5:3b";
+      if (lightModel !== defaultModel) {
+        fetch("/api/setup/pull-model", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: lightModel }),
+        }).catch(() => {});
+      }
+    }
+  }, [mainModel.status, defaultModel]);
+
   async function downloadVectors() {
     if (vectorSync === "syncing") return;
     setVectorSync("syncing");
