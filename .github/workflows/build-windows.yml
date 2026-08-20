@@ -59,7 +59,7 @@ jobs:
 
       - name: Rename artifact for release
         run: |
-          $version = "${{ github.ref_name }}"
+          $version = "${{ github.ref_name }}" -replace '^v',''
           $src = "dist-electron/Mizan Canada.Setup.${version}.exe"
           $dst = "dist-electron/Mizan-Canada.Setup.${version}.exe"
           if (Test-Path $src) { Copy-Item $src $dst }
