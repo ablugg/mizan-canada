@@ -75,12 +75,14 @@ interface HFCaseRow {
   document_date_en?: string;
 }
 
-function streamCases(courtCodes: string[]): HFCaseRow[] {
-  const os = require("os") as typeof import("os");
-  const filterJson = JSON.stringify(courtCodes);
-  const scriptPath = path.join(os.tmpdir(), "mizan_hf_cases.py");
+function streamCases(courtCodes: string[]): Promise<HFCaseRow[]> {
+  return new Promise((resolve, reject) => {
+    const os = require("os") as typeof import("os");
+    const { spawn } = require("child_process") as typeof import("child_process");
+    const filterJson = JSON.stringify(courtCodes);
+    const scriptPath = path.join(os.tmpdir(), "mizan_hf_cases.py");
 
-  fs.writeFileSync(scriptPath, `
+    fs.writeFileSync(scriptPath, `
 import json, sys
 from datasets import load_dataset
 
@@ -100,39 +102,62 @@ for row in ds:
         'name_fr': row.get('name_fr', ''),
         'unofficial_text_en': row.get('unofficial_text_en', '') or '',
         'unofficial_text_fr': row.get('unofficial_text_fr', '') or '',
-        'document_date_en': row.get('document_date_en', ''),
+        'document_date_en': str(row.get('document_date_en', '') or ''),
     }
     print(json.dumps(out, ensure_ascii=False))
     sys.stdout.flush()
     count += 1
 
-print(json.dumps({'_done': True, '_count': count}), file=sys.stderr)
+print(f"Streamed {count} cases", file=sys.stderr)
 `);
 
-  console.log("Streaming from Hugging Face (a2aj/canadian-case-law)...");
-  console.log(`Filtering for courts: ${courtCodes.join(", ")}\n`);
-  console.log("This may take several minutes to stream through the full dataset.\n");
+    console.log("Streaming from Hugging Face (a2aj/canadian-case-law)...");
+    console.log(`Filtering for courts: ${courtCodes.join(", ")}\n`);
+    console.log("This may take several minutes to stream through the full dataset.\n");
 
-  const result = execSync(`python3 "${scriptPath}"`, {
-    encoding: "utf-8",
-    maxBuffer: 4 * 1024 * 1024 * 1024, // 4GB buffer for large datasets
-    timeout: 3600000, // 1 hour timeout
+    const rows: HFCaseRow[] = [];
+    const proc = spawn("python3", [scriptPath], { stdio: ["ignore", "pipe", "pipe"] });
+
+    let buffer = "";
+    proc.stdout.on("data", (chunk: Buffer) => {
+      buffer += chunk.toString("utf-8");
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          rows.push(JSON.parse(line));
+        } catch {
+          // skip malformed
+        }
+      }
+      if (rows.length % 500 === 0 && rows.length > 0) {
+        console.log(`  ...streamed ${rows.length} cases so far`);
+      }
+    });
+
+    proc.stderr.on("data", (chunk: Buffer) => {
+      console.log(`  [python] ${chunk.toString("utf-8").trim()}`);
+    });
+
+    proc.on("close", (code: number) => {
+      // Process remaining buffer
+      if (buffer.trim()) {
+        try { rows.push(JSON.parse(buffer)); } catch {}
+      }
+      try { fs.unlinkSync(scriptPath); } catch {}
+      if (code !== 0) {
+        reject(new Error(`Python exited with code ${code}`));
+      } else {
+        resolve(rows);
+      }
+    });
+
+    proc.on("error", (err: Error) => {
+      try { fs.unlinkSync(scriptPath); } catch {}
+      reject(err);
+    });
   });
-
-  fs.unlinkSync(scriptPath);
-
-  const rows: HFCaseRow[] = [];
-  for (const line of result.split("\n")) {
-    if (!line.trim()) continue;
-    try {
-      const parsed = JSON.parse(line);
-      if (!parsed._done) rows.push(parsed);
-    } catch {
-      // skip malformed
-    }
-  }
-
-  return rows;
 }
 
 async function main() {
@@ -164,7 +189,7 @@ async function main() {
   }
 
   // Download cases
-  const rows = streamCases(courtFilter);
+  const rows = await streamCases(courtFilter);
   console.log(`Downloaded ${rows.length} cases.\n`);
 
   if (rows.length === 0) {
