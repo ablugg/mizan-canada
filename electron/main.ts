@@ -4,8 +4,35 @@ import path from "path";
 import { startNextServer, stopNextServer } from "./server";
 import { OllamaManager } from "./ollama";
 
-// Remove default Electron menu bar -- app is entirely self-contained
-Menu.setApplicationMenu(null);
+// Minimal menu so macOS edit shortcuts (Cmd+C/V/X/A) work
+Menu.setApplicationMenu(
+  Menu.buildFromTemplate([
+    {
+      label: app.name,
+      submenu: [
+        { role: "about" },
+        { type: "separator" },
+        { role: "hide" },
+        { role: "hideOthers" },
+        { role: "unhide" },
+        { type: "separator" },
+        { role: "quit" },
+      ],
+    },
+    {
+      label: "Edit",
+      submenu: [
+        { role: "undo" },
+        { role: "redo" },
+        { type: "separator" },
+        { role: "cut" },
+        { role: "copy" },
+        { role: "paste" },
+        { role: "selectAll" },
+      ],
+    },
+  ])
+);
 
 // Set the app name so macOS menu bar and dock show "Mizan"
 app.setName("Mizan");

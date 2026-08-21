@@ -17,9 +17,17 @@ export default function ResearchPage() {
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [activeModel, setActiveModel] = useState("qwen2.5:7b");
+  const [modelOpen, setModelOpen] = useState(false);
   const prevStreamingRef = useRef(false);
   const isRestoredRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/setup/select-model").then(r => r.json()).then(d => {
+      if (d.model) setActiveModel(d.model);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -87,6 +95,16 @@ export default function ResearchPage() {
         .catch(() => {});
     }
   }, [isStreaming, messages, saveSession]);
+
+  function switchModel(model: string) {
+    setActiveModel(model);
+    setModelOpen(false);
+    fetch("/api/setup/select-model", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model }),
+    }).catch(() => {});
+  }
 
   function handleKey(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -177,7 +195,7 @@ export default function ResearchPage() {
             Legal Research
           </h1>
           <p style={{ fontSize: "11px", color: "#ffffff", marginTop: "2px", fontFamily: "var(--font-dm-sans)" }}>
-            In-depth Q&A · Canadian Federal &amp; Provincial Law · Session saved &amp; retrievable
+            In-depth Q&A · Federal &amp; Provincial Law · SCC Decisions · Session saved &amp; retrievable
           </p>
           <p style={{ fontSize: "10px", color: "rgba(201,168,76,0.5)", marginTop: "3px", fontFamily: "var(--font-dm-sans)" }}>
             All processing is local · 0 bytes leave your device
@@ -340,20 +358,85 @@ export default function ResearchPage() {
               </button>
             </div>
           ) : (
-            <div style={{ display: "flex", gap: "10px", alignItems: "flex-end" }}>
-              <textarea
-                ref={inputRef}
-                onKeyDown={handleKey}
-                onChange={(e) => { e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px"; }}
-                placeholder="Ask a legal research question…"
-                rows={1}
-                style={{ flex: 1, background: "rgba(5,10,24,0.97)", border: "1px solid rgba(22,58,140,0.28)", borderRadius: "10px", padding: "10px 14px", color: "#ffffff", fontSize: "14px", lineHeight: "1.5", resize: "none", outline: "none", fontFamily: "var(--font-dm-sans)", minHeight: "40px", maxHeight: "160px" }}
-                onFocus={(e) => { e.target.style.borderColor = "rgba(201,168,76,0.35)"; }}
-                onBlur={(e) => { e.target.style.borderColor = "rgba(22,58,140,0.28)"; }}
-              />
-              <button onClick={submit} style={{ width: "40px", height: "40px", borderRadius: "9px", display: "flex", alignItems: "center", justifyContent: "center", background: "#c9a84c", border: "none", cursor: "pointer", flexShrink: 0 }}>
-                <Send size={14} style={{ color: "#0b0b10" }} />
-              </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <div style={{ display: "flex", gap: "10px", alignItems: "flex-end" }}>
+                <textarea
+                  ref={inputRef}
+                  onKeyDown={handleKey}
+                  onChange={(e) => { e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px"; }}
+                  placeholder="Ask a legal research question…"
+                  rows={1}
+                  style={{ flex: 1, background: "rgba(5,10,24,0.97)", border: "1px solid rgba(22,58,140,0.28)", borderRadius: "10px", padding: "10px 14px", color: "#ffffff", fontSize: "14px", lineHeight: "1.5", resize: "none", outline: "none", fontFamily: "var(--font-dm-sans)", minHeight: "40px", maxHeight: "160px" }}
+                  onFocus={(e) => { e.target.style.borderColor = "rgba(201,168,76,0.35)"; }}
+                  onBlur={(e) => { e.target.style.borderColor = "rgba(22,58,140,0.28)"; }}
+                />
+                <button onClick={submit} style={{ width: "40px", height: "40px", borderRadius: "9px", display: "flex", alignItems: "center", justifyContent: "center", background: "#c9a84c", border: "none", cursor: "pointer", flexShrink: 0 }}>
+                  <Send size={14} style={{ color: "#0b0b10" }} />
+                </button>
+              </div>
+              {/* Model selector */}
+              <div style={{ position: "relative", alignSelf: "flex-start" }}>
+                <button
+                  onClick={() => setModelOpen(!modelOpen)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "5px",
+                    padding: "3px 8px", borderRadius: "6px",
+                    background: "transparent",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    color: "rgba(140,160,190,0.6)",
+                    fontSize: "10px", fontFamily: "var(--font-dm-sans)",
+                    cursor: "pointer", transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(201,168,76,0.25)"; e.currentTarget.style.color = "rgba(201,168,76,0.7)"; }}
+                  onMouseLeave={(e) => { if (!modelOpen) { e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "rgba(140,160,190,0.6)"; } }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="1" y="2" width="8" height="6" rx="1" stroke="currentColor" strokeWidth="0.9" /><path d="M3 2V1.5A0.5 0.5 0 0 1 3.5 1h3a0.5 0.5 0 0 1 .5.5V2" stroke="currentColor" strokeWidth="0.9" /></svg>
+                  {activeModel}
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M2 3L4 5L6 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  {activeModel === "qwen2.5:3b" && (
+                    <span style={{ color: "rgba(201,168,76,0.4)", fontSize: "9px", marginLeft: "2px" }}>
+                      Switch to 7b for deeper analysis
+                    </span>
+                  )}
+                </button>
+                {modelOpen && (
+                  <>
+                    <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setModelOpen(false)} />
+                    <div style={{
+                      position: "absolute", bottom: "calc(100% + 4px)", left: 0, zIndex: 50,
+                      background: "rgba(10,16,30,0.98)", border: "1px solid rgba(201,168,76,0.18)",
+                      borderRadius: "8px", padding: "4px", minWidth: "160px",
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+                    }}>
+                      {[
+                        { id: "qwen2.5:3b", label: "qwen2.5:3b", desc: "Fast · Light" },
+                        { id: "qwen2.5:7b", label: "qwen2.5:7b", desc: "Balanced" },
+                      ].map((m) => (
+                        <button
+                          key={m.id}
+                          onClick={() => switchModel(m.id)}
+                          style={{
+                            width: "100%", padding: "7px 10px", borderRadius: "6px",
+                            background: activeModel === m.id ? "rgba(201,168,76,0.1)" : "transparent",
+                            border: "none", cursor: "pointer",
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                            transition: "background 0.1s",
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(201,168,76,0.08)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = activeModel === m.id ? "rgba(201,168,76,0.1)" : "transparent"; }}
+                        >
+                          <span style={{ fontSize: "11px", fontFamily: "var(--font-dm-sans)", color: activeModel === m.id ? "#c9a84c" : "rgba(220,228,242,0.8)" }}>
+                            {m.label}
+                          </span>
+                          <span style={{ fontSize: "9px", fontFamily: "var(--font-dm-sans)", color: "rgba(140,160,190,0.5)" }}>
+                            {m.desc}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>

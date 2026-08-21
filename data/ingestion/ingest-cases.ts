@@ -32,7 +32,81 @@ const VECTOR_DB_PATH = process.env.VECTOR_DB_PATH ?? path.join(process.cwd(), "d
 const TABLE_NAME = "legal_chunks";
 
 const CHUNK_SIZE = 400;
+const HEADNOTE_CHUNK_SIZE = 600; // Larger chunks for headnotes to capture full holdings
 const FLUSH_THRESHOLD = 500;
+
+/**
+ * Extract the headnote/summary section from an SCC decision.
+ * SCC decisions follow a structure: metadata → parties → headnote → full opinion.
+ * The headnote contains "Held:", issue summaries, and the disposition.
+ * Returns the headnote text if found, or empty string.
+ */
+function extractHeadnote(text: string): string {
+  // Look for patterns that indicate the start of the headnote summary.
+  // Common markers: "Held:", "Summary:", issue descriptions after party lists.
+  // The headnote typically ends when the full opinion begins (marked by paragraph numbers
+  // like "[1]" or "The Chief Justice" or "Per X J." or "Reasons for judgment").
+
+  // Find the start: look for key headnote indicators
+  const headnoteMarkers = [
+    /\bHeld\s*[:,]/i,
+    /\b(?:Constitutional law|Criminal law|Civil procedure|Administrative law|Charter of Rights)\s*[—–-]/i,
+    /\bAppeal\s+(?:from|allowed|dismissed)/i,
+  ];
+
+  let startIdx = -1;
+  for (const marker of headnoteMarkers) {
+    const match = marker.exec(text);
+    if (match && (startIdx === -1 || match.index < startIdx)) {
+      // Go back to the start of the sentence/paragraph
+      const before = text.lastIndexOf("\n", match.index);
+      startIdx = before > 0 ? before : match.index;
+    }
+  }
+
+  if (startIdx === -1) {
+    // Fallback: try to find the summary section between metadata and opinion
+    // Look for the block after party names that describes the legal issues
+    const issuePattern = /(?:under what circumstances|whether|the question|at issue|this appeal)/i;
+    const issueMatch = issuePattern.exec(text);
+    if (issueMatch) {
+      const before = text.lastIndexOf("\n", issueMatch.index);
+      startIdx = before > 0 ? before : issueMatch.index;
+    }
+  }
+
+  if (startIdx === -1) return "";
+
+  // Find the end: look for the start of the full opinion
+  const opinionMarkers = [
+    /\n\s*\[1\]\s/,                           // Paragraph numbering starts
+    /\n\s*The (?:Chief Justice|judgment|reasons|following)/i,
+    /\n\s*Per\s+\w+\s+(?:C\.?J\.?|J\.)\s/i,   // "Per McLachlin C.J."
+    /\n\s*(?:I|II|III|IV|V)\.\s+[A-Z]/,       // Roman numeral sections
+    /\bReasons for [Jj]udgment/,
+  ];
+
+  let endIdx = text.length;
+  for (const marker of opinionMarkers) {
+    const match = marker.exec(text.slice(startIdx));
+    if (match) {
+      const candidateEnd = startIdx + match.index;
+      if (candidateEnd > startIdx + 100 && candidateEnd < endIdx) {
+        endIdx = candidateEnd;
+      }
+    }
+  }
+
+  // Cap headnote at ~3000 chars to avoid capturing too much
+  const maxLen = 3000;
+  if (endIdx - startIdx > maxLen) {
+    endIdx = startIdx + maxLen;
+  }
+
+  const headnote = text.slice(startIdx, endIdx).trim();
+  // Only return if it's substantial enough
+  return headnote.length >= 100 ? headnote : "";
+}
 
 const ollama = new Ollama({ host: OLLAMA_HOST });
 
@@ -83,10 +157,11 @@ function streamCases(courtCodes: string[]): Promise<HFCaseRow[]> {
     const scriptPath = path.join(os.tmpdir(), "mizan_hf_cases.py");
 
     fs.writeFileSync(scriptPath, `
-import json, sys
+import json, sys, os
 from datasets import load_dataset
 
-ds = load_dataset('a2aj/canadian-case-law', split='train', streaming=True)
+token = os.environ.get('HF_TOKEN') or None
+ds = load_dataset('a2aj/canadian-case-law', split='train', streaming=True, token=token)
 filters = set(${filterJson})
 count = 0
 
@@ -251,25 +326,30 @@ async function main() {
         continue;
       }
 
-      const chunks = chunkText(text, CHUNK_SIZE);
-      if (chunks.length === 0) {
+      // Extract headnote for priority chunking
+      const headnote = extractHeadnote(text);
+      const headnoteChunks = headnote ? chunkText(headnote, HEADNOTE_CHUNK_SIZE) : [];
+      const bodyChunks = chunkText(text, CHUNK_SIZE);
+
+      if (headnoteChunks.length === 0 && bodyChunks.length === 0) {
         skippedDocs++;
         continue;
       }
 
-      console.log(`[${i + 1}/${rows.length}] ${name} (${row.dataset}) - ${chunks.length} chunks`);
+      const allChunks = [...headnoteChunks, ...bodyChunks];
+      console.log(`[${i + 1}/${rows.length}] ${name} (${row.dataset}) - ${headnoteChunks.length} headnote + ${bodyChunks.length} body chunks`);
 
-      const embeddings = await embedBatch(chunks);
+      const embeddings = await embedBatch(allChunks);
 
-      for (let j = 0; j < chunks.length; j++) {
+      for (let j = 0; j < allChunks.length; j++) {
         allRecords.push({
-          id: `case-${row.dataset}-${citation.replace(/[^a-z0-9]/gi, "-")}-${j}`,
+          id: `case-${row.dataset}-${citation.replace(/[^a-z0-9]/gi, "-")}-${j < headnoteChunks.length ? "hn-" : ""}${j}`,
           vector: embeddings[j],
-          text: chunks[j],
+          text: allChunks[j],
           source: `${name} (${citation})`,
           jurisdiction: court,
           statute: citation,
-          section: "",
+          section: j < headnoteChunks.length ? "headnote" : "",
           language: "en",
         });
       }

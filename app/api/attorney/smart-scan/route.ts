@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chatStream, langInstruction } from "@/lib/llm";
+import { retrieveContext } from "@/lib/rag";
 
 const SMART_SCAN_PROMPT = `You are Mizan, an expert legal analyst for Canadian law. A lawyer has highlighted a passage from a legal document and is asking you to explain it.
 
@@ -18,7 +19,7 @@ How to respond:
 - Never fabricate citations or section numbers`;
 
 export async function POST(req: NextRequest) {
-  const { highlight, context, mode, language } = await req.json();
+  const { highlight, context, mode, language, followUp, history } = await req.json();
 
   if (!highlight || typeof highlight !== "string") {
     return NextResponse.json({ error: "No highlighted text provided" }, { status: 400 });
@@ -33,16 +34,39 @@ export async function POST(req: NextRequest) {
 
   const instruction = modeInstructions[mode] || modeInstructions.explain;
 
-  const userContent = [
+  // For follow-ups, retrieve context based on the follow-up question
+  const ragQuery = followUp || highlight;
+  const legalContext = await retrieveContext(ragQuery, 3).catch(() => "");
+  const legalBlock = legalContext
+    ? `\n\n**Relevant Canadian legal context:**\n${legalContext}`
+    : "";
+
+  const initialContent = [
     `${instruction}`,
     `\n\n**Highlighted text:**\n"${highlight}"`,
     context ? `\n\n**Surrounding context from the document:**\n${context}` : "",
+    legalBlock,
   ].join("");
 
   const systemPrompt = SMART_SCAN_PROMPT + langInstruction(language || "en");
 
+  // Build message history: initial analysis + prior exchanges + follow-up
+  const messages: { role: "user" | "assistant"; content: string }[] = [
+    { role: "user", content: initialContent },
+  ];
+
+  if (history && Array.isArray(history)) {
+    for (const msg of history) {
+      messages.push({ role: msg.role, content: msg.content });
+    }
+  }
+
+  if (followUp) {
+    messages.push({ role: "user", content: followUp });
+  }
+
   const stream = chatStream(
-    [{ role: "user", content: userContent }],
+    messages,
     undefined,
     systemPrompt
   );

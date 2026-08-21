@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { chatWithSystem, DEADLINE_PROMPT, langInstruction } from "@/lib/llm";
 import { parseDocumentBuffer } from "@/lib/parse-document";
+import { retrieveDocumentContext } from "@/lib/rag";
 import { LOCAL_USER_ID } from "@/lib/local-auth";
 
 export async function POST(req: NextRequest) {
@@ -18,9 +19,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Could not extract text from document" }, { status: 400 });
   }
 
+  const truncated = text.slice(0, 28000);
+  const legalContext = await retrieveDocumentContext(truncated).catch(() => "");
+  const contextBlock = legalContext
+    ? `\n\nRelevant Canadian legal context (reference statutory limitation periods and deadlines where applicable):\n${legalContext}`
+    : "";
+
   const raw = await chatWithSystem(
-    DEADLINE_PROMPT + langInstruction(language),
-    `Extract all deadlines and obligations from this contract:\n\n${text.slice(0, 28000)}`
+    DEADLINE_PROMPT + contextBlock + langInstruction(language),
+    `Extract all deadlines and obligations from this contract:\n\n${truncated}`
   );
 
   const match = raw.match(/\[[\s\S]*\]/);

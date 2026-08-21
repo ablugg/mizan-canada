@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chatWithSystem, ATTORNEY_SYSTEM_PROMPT } from "@/lib/llm";
+import { retrieveContext } from "@/lib/rag";
 import type { DraftType } from "@/types";
 
 function buildDraftPrompt(docType: string, fields: Record<string, string>, docLang: "en" | "fr"): string {
@@ -42,7 +43,14 @@ export async function POST(req: NextRequest) {
   const lang: "en" | "fr" = docLang === "fr" ? "fr" : "en";
   const userPrompt = buildDraftPrompt(docType, fields, lang);
 
-  const content = await chatWithSystem(ATTORNEY_SYSTEM_PROMPT, userPrompt);
+  // Retrieve legal context relevant to the document type and fields
+  const ragQuery = `${docType} ${Object.values(fields).join(" ")}`.slice(0, 500);
+  const legalContext = await retrieveContext(ragQuery, 3).catch(() => "");
+  const systemWithContext = legalContext
+    ? `${ATTORNEY_SYSTEM_PROMPT}\n\nRelevant Canadian legal context (use to ensure compliance with actual law):\n${legalContext}`
+    : ATTORNEY_SYSTEM_PROMPT;
+
+  const content = await chatWithSystem(systemWithContext, userPrompt);
 
   if (!content.trim())
     return NextResponse.json({ error: "Draft generation returned empty content" }, { status: 500 });

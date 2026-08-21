@@ -2,7 +2,18 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 
-const ALLOWED_MODELS = ["qwen2.5:3b", "qwen2.5:7b", "qwen2.5:14b"];
+const ALLOWED_MODELS = ["qwen2.5:3b", "qwen2.5:7b"];
+
+export async function GET() {
+  try {
+    const configPath = path.join(process.cwd(), "data", "model-config.json");
+    const raw = fs.readFileSync(configPath, "utf-8");
+    const config = JSON.parse(raw) as { model?: string };
+    return NextResponse.json({ model: config.model ?? "qwen2.5:7b" });
+  } catch {
+    return NextResponse.json({ model: "qwen2.5:7b" });
+  }
+}
 
 export async function POST(req: Request) {
   try {

@@ -1,11 +1,16 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { ScanSearch, X, Sparkles, ShieldAlert, ListChecks, FileText, Upload } from "lucide-react";
+import { ScanSearch, X, Sparkles, ShieldAlert, ListChecks, FileText, Upload, Send } from "lucide-react";
 import { DocumentUploadZone } from "@/components/attorney/DocumentUploadZone";
 import { DocStarField } from "@/components/attorney/DocStarField";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+
+interface FollowUpMessage {
+  role: "user" | "assistant";
+  content: string;
+}
 
 interface Explanation {
   id: string;
@@ -13,6 +18,8 @@ interface Explanation {
   mode: string;
   content: string;
   isStreaming: boolean;
+  followUps: FollowUpMessage[];
+  isFollowUpStreaming: boolean;
 }
 
 const MODES = [
@@ -123,6 +130,8 @@ export default function SmartScanPage() {
       mode,
       content: "",
       isStreaming: true,
+      followUps: [],
+      isFollowUpStreaming: false,
     };
     setExplanations((prev) => [explanation, ...prev]);
 
@@ -170,6 +179,91 @@ export default function SmartScanPage() {
         prev.map((e) => (e.id === id ? { ...e, isStreaming: false } : e))
       );
       abortRef.current = null;
+    }
+  }
+
+  async function sendFollowUp(explanationId: string, question: string) {
+    const exp = explanations.find((e) => e.id === explanationId);
+    if (!exp || exp.isStreaming || exp.isFollowUpStreaming) return;
+
+    // Add user message and set streaming state
+    setExplanations((prev) =>
+      prev.map((e) =>
+        e.id === explanationId
+          ? { ...e, followUps: [...e.followUps, { role: "user" as const, content: question }], isFollowUpStreaming: true }
+          : e
+      )
+    );
+
+    // Build history from initial response + follow-ups
+    const history = [
+      { role: "assistant" as const, content: exp.content },
+      ...exp.followUps,
+    ];
+
+    try {
+      const res = await fetch("/api/attorney/smart-scan", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          highlight: exp.highlight,
+          context: getSurroundingContext(exp.highlight),
+          mode: exp.mode,
+          language: localStorage.getItem("mizan-locale") || "en",
+          followUp: question,
+          history,
+        }),
+      });
+
+      if (!res.ok || !res.body) throw new Error("Request failed");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+
+      // Add empty assistant message to stream into
+      setExplanations((prev) =>
+        prev.map((e) =>
+          e.id === explanationId
+            ? { ...e, followUps: [...e.followUps, { role: "assistant" as const, content: "" }] }
+            : e
+        )
+      );
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        setExplanations((prev) =>
+          prev.map((e) => {
+            if (e.id !== explanationId) return e;
+            const updated = [...e.followUps];
+            const last = updated[updated.length - 1];
+            if (last?.role === "assistant") {
+              updated[updated.length - 1] = { ...last, content: last.content + chunk };
+            }
+            return { ...e, followUps: updated };
+          })
+        );
+      }
+    } catch {
+      setExplanations((prev) =>
+        prev.map((e) => {
+          if (e.id !== explanationId) return e;
+          const updated = [...e.followUps];
+          const last = updated[updated.length - 1];
+          if (last?.role === "assistant") {
+            updated[updated.length - 1] = { ...last, content: "Failed to generate response. Please try again." };
+          } else {
+            updated.push({ role: "assistant", content: "Failed to generate response. Please try again." });
+          }
+          return { ...e, followUps: updated };
+        })
+      );
+    } finally {
+      setExplanations((prev) =>
+        prev.map((e) => (e.id === explanationId ? { ...e, isFollowUpStreaming: false } : e))
+      );
     }
   }
 
@@ -389,6 +483,77 @@ export default function SmartScanPage() {
                             <span style={{ color: "rgba(201,168,76,0.6)" }}>Analysing…</span>
                           ) : null}
                         </div>
+
+                        {/* Follow-up messages */}
+                        {exp.followUps?.length > 0 && (
+                          <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                            {exp.followUps.map((msg, i) => (
+                              <div key={i}>
+                                {msg.role === "user" ? (
+                                  <div style={{ padding: "6px 10px", borderRadius: "8px", background: "rgba(240,236,226,0.08)", border: "1px solid rgba(180,155,100,0.15)", fontSize: "11px", color: "rgba(240,236,226,0.8)", fontFamily: "var(--font-dm-sans)" }}>
+                                    {msg.content}
+                                  </div>
+                                ) : (
+                                  <div className="research-md" style={{ fontSize: "12px", lineHeight: 1.7, color: "rgba(220,228,240,0.85)", borderLeft: "1.5px solid rgba(201,168,76,0.15)", paddingLeft: "10px", marginTop: "4px" }}>
+                                    {msg.content ? (
+                                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a> }}>
+                                        {msg.content}
+                                      </ReactMarkdown>
+                                    ) : (
+                                      <span style={{ color: "rgba(201,168,76,0.6)" }}>Thinking…</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Follow-up input */}
+                        {!exp.isStreaming && (
+                          <div style={{ marginTop: "10px" }}>
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                const input = e.currentTarget.querySelector("input") as HTMLInputElement;
+                                const val = input?.value.trim();
+                                if (!val || exp.isFollowUpStreaming || !exp.followUps) return;
+                                sendFollowUp(exp.id, val);
+                                input.value = "";
+                              }}
+                              style={{ display: "flex", gap: "6px", alignItems: "center" }}
+                            >
+                              <input
+                                type="text"
+                                placeholder="Ask a follow-up…"
+                                disabled={exp.isFollowUpStreaming}
+                                style={{
+                                  flex: 1, padding: "6px 10px", borderRadius: "7px",
+                                  background: "rgba(5,10,24,0.8)",
+                                  border: "1px solid rgba(255,255,255,0.08)",
+                                  color: "#ffffff", fontSize: "11px",
+                                  fontFamily: "var(--font-dm-sans)",
+                                  outline: "none",
+                                }}
+                                onFocus={(e) => { e.target.style.borderColor = "rgba(201,168,76,0.3)"; }}
+                                onBlur={(e) => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                              />
+                              <button
+                                type="submit"
+                                disabled={exp.isFollowUpStreaming}
+                                style={{
+                                  width: "26px", height: "26px", borderRadius: "6px",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  background: "rgba(201,168,76,0.15)", border: "1px solid rgba(201,168,76,0.25)",
+                                  cursor: exp.isFollowUpStreaming ? "wait" : "pointer",
+                                  flexShrink: 0, opacity: exp.isFollowUpStreaming ? 0.5 : 1,
+                                }}
+                              >
+                                <Send size={10} style={{ color: "#c9a84c" }} />
+                              </button>
+                            </form>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

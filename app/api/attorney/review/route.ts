@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chatWithSystem, DOCUMENT_REVIEW_PROMPT, langInstruction } from "@/lib/llm";
 import { parseDocumentBuffer } from "@/lib/parse-document";
+import { retrieveDocumentContext } from "@/lib/rag";
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -24,8 +25,13 @@ export async function POST(req: NextRequest) {
       ? `\n\nReview focus: ${reviewFocus}. Pay particular attention to issues related to this focus area.`
       : "";
 
+  const legalContext = await retrieveDocumentContext(truncated).catch(() => "");
+  const contextBlock = legalContext
+    ? `\n\nRelevant Canadian legal context (use to ground your analysis):\n${legalContext}`
+    : "";
+
   const raw = await chatWithSystem(
-    DOCUMENT_REVIEW_PROMPT + focusInstruction + langInstruction(language),
+    DOCUMENT_REVIEW_PROMPT + focusInstruction + contextBlock + langInstruction(language),
     `Please review this document:\n\n${truncated}`
   );
 

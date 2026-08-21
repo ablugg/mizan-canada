@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chatWithSystem, REDLINE_PROMPT, langInstruction } from "@/lib/llm";
 import { parseDocumentBuffer } from "@/lib/parse-document";
+import { retrieveDocumentContext } from "@/lib/rag";
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -22,8 +23,13 @@ export async function POST(req: NextRequest) {
   const truncated = text.slice(0, 28_000);
   const contextInstruction = `\n\nReview type: ${reviewType}.\nClient position: ${clientPosition} (optimize suggestions to favor this party where applicable).`;
 
+  const legalContext = await retrieveDocumentContext(truncated).catch(() => "");
+  const contextBlock = legalContext
+    ? `\n\nRelevant Canadian legal context (use to ground your suggestions in actual law):\n${legalContext}`
+    : "";
+
   const raw = await chatWithSystem(
-    REDLINE_PROMPT + contextInstruction + langInstruction(language),
+    REDLINE_PROMPT + contextInstruction + contextBlock + langInstruction(language),
     `Please redline this document:\n\n${truncated}`
   );
 

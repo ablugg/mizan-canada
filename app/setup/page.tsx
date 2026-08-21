@@ -42,12 +42,10 @@ interface ModelTier {
 const MODEL_TIERS: ModelTier[] = [
   { id: "qwen2.5:3b", name: "qwen2.5:3b", size: "~2 GB", ramNeeded: "8 GB", description: "Fastest responses, good for basic tasks" },
   { id: "qwen2.5:7b", name: "qwen2.5:7b", size: "~4.7 GB", ramNeeded: "16 GB", description: "Best balance of speed and quality" },
-  { id: "qwen2.5:14b", name: "qwen2.5:14b", size: "~9 GB", ramNeeded: "32 GB", description: "Highest quality, slower on most hardware" },
 ];
 
 function recommendModel(hw: HardwareInfo): string {
   const ramGB = hw.totalRam / (1024 * 1024 * 1024);
-  if (ramGB >= 28) return "qwen2.5:14b";
   if (ramGB >= 12) return "qwen2.5:7b";
   return "qwen2.5:3b";
 }
@@ -212,36 +210,14 @@ const J_CONFIG: Record<Jurisdiction, { accent: string; accentRgb: string; flag: 
 export default function SetupPage() {
   const router = useRouter();
 
-  // Determine initial step from localStorage synchronously to avoid flash
-  const [step, setStep] = useState<"pick" | "download">(() => {
-    if (typeof window === "undefined") return "pick";
-    if (localStorage.getItem("mizan-setup-done") === "1") return "download";
-    try {
-      const raw = localStorage.getItem("mizan-jurisdictions");
-      if (raw) {
-        const saved = JSON.parse(raw) as Jurisdiction[];
-        if (saved.length > 0) return "download";
-      }
-    } catch { /* */ }
-    return "pick";
-  });
-
-  const [selectedJurisdictions, setSelectedJurisdictions] = useState<Jurisdiction[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const raw = localStorage.getItem("mizan-jurisdictions");
-      return raw ? (JSON.parse(raw) as Jurisdiction[]) : [];
-    } catch { return []; }
-  });
-
+  const [mounted, setMounted] = useState(false);
+  const [step, setStep] = useState<"pick" | "download">("pick");
+  const [selectedJurisdictions, setSelectedJurisdictions] = useState<Jurisdiction[]>([]);
   const [status, setStatus] = useState<SetupStatus | null>(null);
-  const [checking, setChecking] = useState(step === "download");
+  const [checking, setChecking] = useState(false);
   const [isLight] = useState(false);
   const [hardware, setHardware] = useState<HardwareInfo | null>(null);
-  const [selectedModel, setSelectedModel] = useState<string>(() => {
-    if (typeof window === "undefined") return "";
-    return localStorage.getItem("mizan-selected-model") ?? "";
-  });
+  const [selectedModel, setSelectedModel] = useState<string>("");
 
   const activeJ: Jurisdiction = selectedJurisdictions[0] ?? "ca";
   const jc = J_CONFIG[activeJ];
@@ -269,15 +245,36 @@ export default function SetupPage() {
   const pullingMain = useRef(false);
   const pullingEmbed = useRef(false);
 
+  // Read localStorage after mount to avoid SSR hydration mismatch
   useEffect(() => {
     const migratePromise = fetch("/api/setup/migrate", { method: "POST" }).catch(() => {});
-    if (typeof window !== "undefined" && localStorage.getItem("mizan-setup-done") === "1") {
-      // Wait for migrate to finish before redirecting so the local user exists
+    if (localStorage.getItem("mizan-setup-done") === "1") {
       migratePromise.then(() => router.replace("/attorney/research"));
       return;
     }
+
+    // Restore saved state from localStorage
+    let initialStep: "pick" | "download" = "pick";
+    try {
+      const raw = localStorage.getItem("mizan-jurisdictions");
+      if (raw) {
+        const saved = JSON.parse(raw) as Jurisdiction[];
+        if (saved.length > 0) {
+          setSelectedJurisdictions(saved);
+          initialStep = "download";
+        }
+      }
+    } catch { /* */ }
+
+    const savedModel = localStorage.getItem("mizan-selected-model") ?? "";
+    if (savedModel) setSelectedModel(savedModel);
+
+    setStep(initialStep);
+    setMounted(true);
+
     detectHardware();
-    if (step === "download") {
+    if (initialStep === "download") {
+      setChecking(true);
       check();
     }
   }, []);
@@ -464,6 +461,24 @@ export default function SetupPage() {
   const anyPending = mainModel.status !== "done" || embedModel.status !== "done" || vectorSync !== "done";
 
   const lawPackLabel = "~7 MB  |  Canadian federal and provincial law statutes";
+
+  // ── Pre-mount: render a simple spinner (matches server output exactly) ───
+  if (!mounted) {
+    return (
+      <div style={{
+        minHeight: "100vh", background: "#060d1a",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <div style={{
+          width: "32px", height: "32px", borderRadius: "50%",
+          border: "2px solid #c9a84c26",
+          borderTopColor: "#c9a84c",
+          animation: "spin 0.8s linear infinite",
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   // ── Jurisdiction picker ────────────────────────────────────────────────────
   if (step === "pick") {

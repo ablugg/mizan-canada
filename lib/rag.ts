@@ -74,9 +74,38 @@ export interface LegalChunk {
   language?: string;
 }
 
+// Extract case names and legal keywords from a query for keyword search.
+// Looks for patterns like "v." (case names), statute names, and SCC citations.
+function extractKeywords(query: string): string[] {
+  const keywords: string[] = [];
+
+  // Match case names: "X v. Y" or "X v Y"
+  const casePattern = /([A-Z][\w''\-éèêëàâîïôùûü]+(?:\s+\([^)]*\))?)\s+v\.?\s+([A-Z][\w''\-éèêëàâîïôùûü]+(?:\s+\([^)]*\))?)/gi;
+  let match;
+  while ((match = casePattern.exec(query)) !== null) {
+    // Use both party names for keyword search
+    keywords.push(match[1].trim());
+    keywords.push(match[2].trim());
+  }
+
+  // Match SCC/SCR citations like "2013 SCC 72" or "[2013] 3 SCR 1101"
+  const citPattern = /\d{4}\s+SCC\s+\d+|\[\d{4}\]\s+\d+\s+S\.?C\.?R\.?\s+\d+/gi;
+  while ((match = citPattern.exec(query)) !== null) {
+    keywords.push(match[0].trim());
+  }
+
+  // Match common statute references like "section 210" or "s. 7"
+  const sectionPattern = /(?:section|s\.)\s+\d+/gi;
+  while ((match = sectionPattern.exec(query)) !== null) {
+    keywords.push(match[0].trim());
+  }
+
+  return keywords;
+}
+
 export async function retrieveContext(
   query: string,
-  topK = 2,
+  topK = 6,
   jurisdiction = "ca"
 ): Promise<string> {
   const queryEmbedding = await embed(query);
@@ -110,17 +139,109 @@ export async function retrieveContext(
     }
   }
 
-  const [baseResults, userResults] = await Promise.all([
+  // Keyword search: find chunks matching case names or citations in the source field.
+  // Headnote chunks (section="headnote") are prioritized.
+  async function keywordSearch(tableName: string): Promise<LegalChunk[]> {
+    const keywords = extractKeywords(query);
+    if (keywords.length === 0) return [];
+
+    try {
+      const table = await db.openTable(tableName);
+      const results: LegalChunk[] = [];
+
+      for (const kw of keywords) {
+        try {
+          // Escape single quotes in keywords for SQL
+          const escaped = kw.replace(/'/g, "''");
+          const matches = await table
+            .query()
+            .where(`source LIKE '%${escaped}%'`)
+            .select(["id", "text", "source", "jurisdiction", "statute", "section", "language"])
+            .limit(6)
+            .toArray() as LegalChunk[];
+          results.push(...matches);
+        } catch {
+          // Keyword filter failed for this term, skip
+        }
+      }
+
+      // Sort headnote chunks first — they contain the holdings and key legal tests
+      results.sort((a, b) => {
+        const aHn = a.section === "headnote" ? 0 : 1;
+        const bHn = b.section === "headnote" ? 0 : 1;
+        return aHn - bHn;
+      });
+
+      return results;
+    } catch {
+      return [];
+    }
+  }
+
+  const [baseResults, userResults, keywordResults] = await Promise.all([
     searchTable(TABLE_NAME),
     searchTable(USER_TABLE_NAME),
+    keywordSearch(TABLE_NAME),
   ]);
 
-  const all = [...baseResults, ...userResults];
-  if (!all.length) return "";
+  // Merge: keyword results first (highest relevance), then vector results, deduplicated
+  const seen = new Set<string>();
+  const merged: LegalChunk[] = [];
 
-  return all
+  // Keyword matches get priority
+  for (const chunk of keywordResults) {
+    const key = chunk.id ?? `${chunk.source}-${chunk.text.slice(0, 50)}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(chunk);
+    }
+  }
+
+  // Then vector results
+  for (const chunk of [...baseResults, ...userResults]) {
+    const key = chunk.id ?? `${chunk.source}-${chunk.text.slice(0, 50)}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(chunk);
+    }
+  }
+
+  // Limit total to avoid overflowing context window
+  const limited = merged.slice(0, topK + 4);
+
+  if (!limited.length) return "";
+
+  console.log(`[rag] Hybrid search: ${keywordResults.length} keyword + ${baseResults.length + userResults.length} vector = ${limited.length} unique chunks`);
+
+  return limited
     .map((meta) => `[${meta.source} -- ${meta.jurisdiction}${meta.statute ? ` -- ${meta.statute}` : ""}]\n${meta.text}`)
     .join("\n\n---\n\n");
+}
+
+/**
+ * Retrieve legal context relevant to a document's content.
+ * Takes a sample from the document (intro + key sections), embeds it,
+ * and retrieves relevant statutes/case law from the vector store.
+ */
+export async function retrieveDocumentContext(
+  documentText: string,
+  topK = 3,
+  jurisdiction = "ca"
+): Promise<string> {
+  // Take the first ~1500 chars (usually contains parties, subject matter, key terms)
+  // plus a sample from the middle for broader coverage
+  const intro = documentText.slice(0, 1500);
+  const mid = documentText.slice(
+    Math.floor(documentText.length * 0.3),
+    Math.floor(documentText.length * 0.3) + 800
+  );
+  const sample = `${intro}\n${mid}`;
+
+  try {
+    return await retrieveContext(sample, topK, jurisdiction);
+  } catch {
+    return "";
+  }
 }
 
 export async function addUserLaw(doc: {

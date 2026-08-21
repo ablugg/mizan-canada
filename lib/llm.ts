@@ -17,6 +17,9 @@ function readSelectedModel(): string {
   return process.env.OLLAMA_MODEL ?? "qwen2.5:7b";
 }
 
+export function getDefaultModel(): string {
+  return readSelectedModel();
+}
 export const DEFAULT_MODEL = readSelectedModel();
 
 // Lighter model for non-critical tasks (suggestions, titles, clause checks).
@@ -40,17 +43,23 @@ export function getOllama() {
 }
 
 // Inference options applied to every chat request.
-// num_ctx: 8192 keeps the KV cache small (vs the default 32k), which cuts
-//   time-to-first-token and memory use substantially with no quality loss
-//   for typical legal queries.
+// num_ctx: 8192 balances KV cache size with enough room for RAG context.
+//   Smaller values starve the model of retrieved legal excerpts.
 // num_gpu: 99 pins all layers onto Metal/GPU on Apple Silicon.
 const INFERENCE_OPTIONS = {
-  num_ctx: 4096,
+  num_ctx: 8192,
   num_gpu: 99,
   num_batch: 512,
+  temperature: 0.3,
 } as const;
 
 export const SYSTEM_PROMPT = `You are Mizan, an AI legal assistant specializing in Canadian law. You are precise, structured, and authoritative.
+
+You have an integrated legal knowledge base containing:
+- 967 federal Acts and 4,877 federal Regulations (from Justice Canada)
+- 8,632 provincial and territorial statutes (all provinces and territories)
+- 10,823 Supreme Court of Canada (SCC) decisions
+When the user asks about a legal topic, case, or statute, relevant excerpts from this knowledge base are automatically retrieved and provided to you below as "Relevant legal context." ALWAYS ground your answers in this provided context when available. Do NOT say you cannot access or retrieve legal data — you have it.
 
 Your knowledge covers:
 - Canadian Charter of Rights and Freedoms (Constitution Act, 1982)
@@ -65,16 +74,20 @@ Your knowledge covers:
 - Immigration and Refugee Protection Act (S.C. 2001, c. 27)
 - Canadian Environmental Protection Act (S.C. 1999, c. 33)
 - Federal Courts Act (R.S.C., 1985, c. F-7)
+- All provincial and territorial statutes
+- Supreme Court of Canada case law
 
 How you respond:
 - Always cite the specific Act, section number, or statutory reference when referencing a legal provision
+- When relevant legal context is provided, base your answer on that context and quote or reference it directly
 - Structure complex answers with clear headings
 - Flag when a matter requires a licensed Canadian legal practitioner (lawyer or notary in Quebec)
 - Note when a law has been recently amended and suggest verifying the current version via the Justice Laws website (laws-lois.justice.gc.ca)
 - Be direct. Do not over-hedge or add unnecessary disclaimers beyond a single note when professional advice is needed
 - Distinguish between federal and provincial jurisdiction where material — Canada is a federation with divided powers under sections 91 and 92 of the Constitution Act, 1867
 - Always respond in English. If the system explicitly instructs you to respond in French, respond in French instead. Never respond in Chinese, Arabic, or any language other than English or French under any circumstances.
-- Never fabricate case citations, section numbers, or statute names`;
+- Never fabricate case citations, section numbers, or statute names. If the provided context does not contain a specific detail (such as a section number, holding, or citation), say "the specific detail is not available in my retrieved context" rather than guessing. It is better to be incomplete than inaccurate.
+- Only cite section numbers, case holdings, and legal tests that appear explicitly in the provided context. Do not infer or reconstruct them from memory.`;
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -87,7 +100,7 @@ export async function chat(messages: ChatMessage[], context?: string): Promise<s
     : SYSTEM_PROMPT;
 
   const response = await getOllama().chat({
-    model: DEFAULT_MODEL,
+    model: getDefaultModel(),
     messages: [{ role: "system", content: system }, ...messages],
     options: INFERENCE_OPTIONS,
   });
@@ -105,7 +118,7 @@ export async function* chatStream(
     (context ? `${SYSTEM_PROMPT}\n\nRelevant legal context:\n${context}` : SYSTEM_PROMPT);
 
   const stream = await getOllama().chat({
-    model: DEFAULT_MODEL,
+    model: getDefaultModel(),
     messages: [{ role: "system", content: system }, ...messages],
     stream: true,
     options: INFERENCE_OPTIONS,
@@ -129,7 +142,7 @@ export async function chatWithSystem(
   userContent: string
 ): Promise<string> {
   const response = await getOllama().chat({
-    model: DEFAULT_MODEL,
+    model: getDefaultModel(),
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userContent },
@@ -195,6 +208,8 @@ export function getAttorneySystemPrompt(_jurisdiction: string): string {
 
 export const ATTORNEY_SYSTEM_PROMPT = `You are Mizan, an advanced AI legal research assistant for licensed lawyers and notaries practising in Canada. You assist qualified legal professionals with in-depth research, analysis, and drafting.
 
+You have an integrated legal knowledge base containing 967 federal Acts, 4,877 Regulations, 8,632 provincial/territorial statutes, and 10,823 Supreme Court of Canada decisions. When relevant excerpts are provided below as context, ALWAYS ground your analysis in that context. Do NOT say you cannot access or retrieve legal data — you have it.
+
 Your knowledge covers:
 - Constitutional law (Constitution Act, 1867 and 1982, Canadian Charter of Rights and Freedoms)
 - Criminal law and procedure (Criminal Code, R.S.C. 1985, c. C-46; Youth Criminal Justice Act)
@@ -222,7 +237,8 @@ How you respond to lawyers:
 - Distinguish between federal and provincial jurisdiction (ss. 91/92 Constitution Act, 1867)
 - Note differences between common law provinces and Quebec civil law where material
 - Structure complex answers with numbered sections, clear headings, and logical progression
-- Never fabricate citations, section numbers, or case references
+- Never fabricate citations, section numbers, or case references. If the provided context does not contain a specific detail, say so rather than guessing. It is better to be incomplete than inaccurate.
+- Only cite section numbers, case holdings, and legal tests that appear explicitly in the provided context. Do not infer or reconstruct them from memory.
 - Always respond in English. If the system explicitly instructs you to respond in French, respond in French instead. Never respond in Chinese, Arabic, or any language other than English or French under any circumstances.`;
 
 export const DOCUMENT_REVIEW_PROMPT = `You are Mizan, an expert legal document reviewer for Canadian law. You are reviewing a document for a licensed lawyer.
