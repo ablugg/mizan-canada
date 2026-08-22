@@ -1,7 +1,9 @@
 /**
- * Adds headnote-only chunks for SCC decisions to the existing vector store.
- * Does NOT re-ingest body chunks — only adds new headnote chunks tagged
- * with section="headnote" for priority retrieval.
+ * Adds whole headnotes for SCC decisions to the existing vector store.
+ * Each headnote is kept as a single chunk (not split) so retrieval returns
+ * the complete holding, test, and disposition together.
+ *
+ * Deletes any previous fragmented headnote chunks before re-ingesting.
  *
  * Run with: npx tsx data/ingestion/ingest-headnotes.ts
  *
@@ -14,14 +16,12 @@ config({ path: ".env" });
 import * as fs from "fs";
 import * as path from "path";
 import { Ollama } from "ollama";
-import { chunkText } from "./build-vectors";
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? "http://127.0.0.1:11434";
 const EMBEDDING_MODEL = process.env.OLLAMA_EMBEDDING_MODEL ?? "nomic-embed-text";
 const VECTOR_DB_PATH = process.env.VECTOR_DB_PATH ?? path.join(process.cwd(), "data/vector-store");
 const TABLE_NAME = "legal_chunks";
 
-const HEADNOTE_CHUNK_SIZE = 600;
 const FLUSH_THRESHOLD = 500;
 
 const ollama = new Ollama({ host: OLLAMA_HOST });
@@ -97,7 +97,9 @@ function extractHeadnote(text: string): string {
     }
   }
 
-  const maxLen = 3000;
+  // Allow up to ~10,000 chars (~2,000 words) to capture full headnotes
+  // The embedBatch function truncates to 2,000 words for the embedding model
+  const maxLen = 10000;
   if (endIdx - startIdx > maxLen) {
     endIdx = startIdx + maxLen;
   }
@@ -225,6 +227,18 @@ async function main() {
     process.exit(1);
   }
 
+  // Delete old fragmented headnote chunks
+  console.log("Deleting old headnote chunks...");
+  try {
+    const table = await db.openTable(TABLE_NAME);
+    await (table as unknown as { delete: (filter: string) => Promise<void> }).delete(
+      `section = 'headnote'`
+    );
+    console.log("Old headnote chunks deleted.\n");
+  } catch (e) {
+    console.log("No old headnote chunks found (or delete failed), continuing.\n");
+  }
+
   let allRecords: Record<string, unknown>[] = [];
   let totalRecords = 0;
   let headnoteCount = 0;
@@ -256,30 +270,23 @@ async function main() {
       continue;
     }
 
-    const chunks = chunkText(headnote, HEADNOTE_CHUNK_SIZE);
-    if (chunks.length === 0) {
-      noHeadnote++;
-      continue;
-    }
-
     if ((i + 1) % 500 === 0) {
       console.log(`[${i + 1}/${rows.length}] Processing headnotes... (${headnoteCount} extracted so far)`);
     }
 
-    const embeddings = await embedBatch(chunks);
+    // Embed the whole headnote as a single chunk
+    const embeddings = await embedBatch([headnote]);
 
-    for (let j = 0; j < chunks.length; j++) {
-      allRecords.push({
-        id: `case-SCC-${citation.replace(/[^a-z0-9]/gi, "-")}-hn-${j}`,
-        vector: embeddings[j],
-        text: chunks[j],
-        source: `${name} (${citation})`,
-        jurisdiction: "Supreme Court of Canada",
-        statute: citation,
-        section: "headnote",
-        language: "en",
-      });
-    }
+    allRecords.push({
+      id: `case-SCC-${citation.replace(/[^a-z0-9]/gi, "-")}-hn`,
+      vector: embeddings[0],
+      text: headnote,
+      source: `${name} (${citation})`,
+      jurisdiction: "Supreme Court of Canada",
+      statute: citation,
+      section: "headnote",
+      language: "en",
+    });
 
     headnoteCount++;
 
@@ -294,7 +301,7 @@ async function main() {
   console.log("Summary:");
   console.log(`  Cases with headnotes: ${headnoteCount}`);
   console.log(`  Cases without headnotes: ${noHeadnote}`);
-  console.log(`  Headnote chunks added: ${totalRecords}`);
+  console.log(`  Whole headnote records added: ${totalRecords}`);
   console.log(`\nVector store: ${VECTOR_DB_PATH}`);
 }
 

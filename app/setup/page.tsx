@@ -40,14 +40,20 @@ interface ModelTier {
 }
 
 const MODEL_TIERS: ModelTier[] = [
-  { id: "qwen2.5:3b", name: "qwen2.5:3b", size: "~2 GB", ramNeeded: "8 GB", description: "Fastest responses, good for basic tasks" },
-  { id: "qwen2.5:7b", name: "qwen2.5:7b", size: "~4.7 GB", ramNeeded: "16 GB", description: "Best balance of speed and quality" },
+  { id: "qwen3:1.7b", name: "qwen3:1.7b", size: "~1.2 GB", ramNeeded: "4 GB", description: "Quickest responses — not for deep reasoning" },
+  { id: "qwen3:4b", name: "qwen3:4b", size: "~2.6 GB", ramNeeded: "8 GB", description: "Fast, good for most tasks" },
+  { id: "qwen3:8b", name: "qwen3:8b", size: "~4.9 GB", ramNeeded: "16 GB", description: "Deep reasoning and accuracy" },
+  { id: "qwen3:14b", name: "qwen3:14b", size: "~9 GB", ramNeeded: "20 GB", description: "Pro — stronger reasoning, fewer hallucinations" },
+  { id: "command-r", name: "command-r", size: "~20 GB", ramNeeded: "36 GB", description: "RAG-optimized — best citation accuracy" },
 ];
 
 function recommendModel(hw: HardwareInfo): string {
   const ramGB = hw.totalRam / (1024 * 1024 * 1024);
-  if (ramGB >= 12) return "qwen2.5:7b";
-  return "qwen2.5:3b";
+  if (ramGB >= 36) return "command-r";
+  if (ramGB >= 20) return "qwen3:14b";
+  if (ramGB >= 12) return "qwen3:8b";
+  if (ramGB >= 6) return "qwen3:4b";
+  return "qwen3:1.7b";
 }
 
 function formatRam(bytes: number): string {
@@ -228,7 +234,7 @@ export default function SetupPage() {
   const cardBg = "rgba(255,255,255,0.03)";
   const border = "rgba(255,255,255,0.06)";
 
-  const defaultModel = selectedModel || status?.defaultModel || "qwen2.5:7b";
+  const defaultModel = selectedModel || status?.defaultModel || "qwen3:8b";
   const embeddingModel = status?.embeddingModel ?? "nomic-embed-text";
 
   const [mainModel, setMainModel] = useState<ModelState>({
@@ -418,13 +424,13 @@ export default function SetupPage() {
   function downloadMainModel() { pullModel(defaultModel, setMainModel, pullingMain); }
   function downloadEmbedModel() { pullModel(embeddingModel, setEmbedModel, pullingEmbed); }
 
-  // Silently pull the light model (qwen2.5:3b) in the background after main model is ready.
+  // Silently pull the light model (qwen3:4b) in the background after main model is ready.
   // This enables faster suggestions and title generation without user interaction.
   const lightPulled = useRef(false);
   useEffect(() => {
     if (mainModel.status === "done" && !lightPulled.current) {
       lightPulled.current = true;
-      const lightModel = "qwen2.5:3b";
+      const lightModel = "qwen3:4b";
       if (lightModel !== defaultModel) {
         fetch("/api/setup/pull-model", {
           method: "POST",

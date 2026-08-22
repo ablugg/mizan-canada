@@ -66,6 +66,19 @@ html[lang="ar"] * {
   to   { opacity: 1; }
 }
 
+@keyframes contentReveal {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.research-md.streaming {
+  animation: contentReveal 0.4s ease both;
+}
+
+.research-md.streaming > * {
+  animation: fadeIn 0.35s ease both;
+}
+
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0; }
@@ -226,6 +239,8 @@ html[lang="ar"] * {
 .research-md h2 { font-size: 16px; }
 .research-md h3 { font-family: var(--font-dm-sans); font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(201,168,76,0.85); margin: 1em 0 0.35em; }
 .research-md strong { font-weight: 600; color: #ffffff; font-family: var(--font-cormorant); }
+.research-md h1 strong, .research-md h2 strong { color: #e8d5a0; }
+.research-md h3 strong { color: rgba(201,168,76,0.85); }
 .research-md em { font-style: italic; color: rgba(255,255,255,0.85); }
 .research-md ul, .research-md ol { padding-left: 1.4em; margin: 0.5em 0 0.75em; }
 .research-md li { margin-bottom: 0.3em; }

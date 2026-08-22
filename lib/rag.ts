@@ -184,27 +184,36 @@ export async function retrieveContext(
     keywordSearch(TABLE_NAME),
   ]);
 
-  // Merge: keyword results first (highest relevance), then vector results, deduplicated
+  // Merge: keyword results first (highest relevance), then vector results, deduplicated.
+  // Headnote chunks are prioritized within each group.
+  // Limit to 2 chunks per source to avoid one case dominating context.
   const seen = new Set<string>();
+  const sourceCount = new Map<string, number>();
+  const MAX_PER_SOURCE = 2;
   const merged: LegalChunk[] = [];
 
-  // Keyword matches get priority
-  for (const chunk of keywordResults) {
+  function addChunk(chunk: LegalChunk): boolean {
     const key = chunk.id ?? `${chunk.source}-${chunk.text.slice(0, 50)}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      merged.push(chunk);
-    }
+    if (seen.has(key)) return false;
+    const srcKey = chunk.source?.split("(")[0]?.trim() ?? chunk.source;
+    const count = sourceCount.get(srcKey) ?? 0;
+    if (count >= MAX_PER_SOURCE) return false;
+    seen.add(key);
+    sourceCount.set(srcKey, count + 1);
+    merged.push(chunk);
+    return true;
   }
 
-  // Then vector results
-  for (const chunk of [...baseResults, ...userResults]) {
-    const key = chunk.id ?? `${chunk.source}-${chunk.text.slice(0, 50)}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      merged.push(chunk);
-    }
-  }
+  // Keyword matches get priority — headnotes first within keyword results
+  const kwHeadnotes = keywordResults.filter((c) => c.section === "headnote");
+  const kwOther = keywordResults.filter((c) => c.section !== "headnote");
+  for (const chunk of [...kwHeadnotes, ...kwOther]) addChunk(chunk);
+
+  // Then vector results — headnotes first
+  const vecAll = [...baseResults, ...userResults];
+  const vecHeadnotes = vecAll.filter((c) => c.section === "headnote");
+  const vecOther = vecAll.filter((c) => c.section !== "headnote");
+  for (const chunk of [...vecHeadnotes, ...vecOther]) addChunk(chunk);
 
   // Limit total to avoid overflowing context window
   const limited = merged.slice(0, topK + 4);

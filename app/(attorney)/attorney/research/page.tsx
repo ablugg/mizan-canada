@@ -8,6 +8,78 @@ import { Message } from "@/types";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+const THINKING_PHRASES = [
+  "Gathering the books together…",
+  "Shuffling the papers…",
+  "Reading every single page…",
+  "Amalgamating information…",
+  "Veritas super omnia…",
+  "Cross-referencing case law…",
+  "Consulting the authorities… just kidding",
+  "Flipping through the statutes…",
+  "Objection! Just kidding…",
+  "Dusting off the law reports…",
+  "Citing sources diligently…",
+  "Checking the footnotes…",
+  "Reviewing the headnotes…",
+  "Stare decisis in progress…",
+  "Building your argument…",
+  "Briefing the bench…",
+  "Sustained! One moment…",
+  "Reading the fine print…",
+  "Approaching the bench…",
+  "Order in the court…",
+  "Entering exhibit A…",
+  "Res ipsa loquitur…",
+  "Preparing closing arguments…",
+  "Your honour, bear with me…",
+  "Habeas corpus-ing the data…",
+  "Filing a motion to think harder…",
+  "May it please the court…",
+  "Summoning the ratio decidendi…",
+  "This won't be billable…",
+  // Famous quotes
+  "\"Justice delayed is justice denied.\" — William Gladstone",
+  "\"The law is reason, free from passion.\" — Aristotle",
+  "\"Injustice anywhere is a threat to justice everywhere.\" — MLK Jr.",
+  "\"The life of the law has not been logic; it has been experience.\" — Oliver Wendell Holmes",
+  "\"Laws are like sausages — better not to see them being made.\" — Otto von Bismarck",
+  "\"The first duty of society is justice.\" — Alexander Hamilton",
+  "\"Where there is a right, there is a remedy.\" — Legal Maxim",
+  "\"Equity follows the law.\" — Legal Maxim",
+  "\"The law must be stable, but it must not stand still.\" — Roscoe Pound",
+  "\"A lawyer without history or literature is a mechanic.\" — Sir Walter Scott",
+  "\"Facts are stubborn things.\" — John Adams",
+  "\"In the halls of justice, the only justice is in the halls.\" — Lenny Bruce",
+  "\"The good lawyer is not the man who has an eye to every side and angle of contingency.\" — Abraham Lincoln",
+  "\"It is not wisdom but authority that makes a law.\" — Thomas Hobbes",
+  "\"The law is not a light for you or any man to see by; the law is not an instrument of any kind.\" — Robert Bolt",
+  "\"Justice is the constant and perpetual will to allot every man his due.\" — Justinian I",
+  "\"Courage is the first of human qualities because it guarantees all others.\" — Aristotle",
+  "\"The safety of the people shall be the highest law.\" — Cicero",
+  "\"No man is above the law and no man is below it.\" — Theodore Roosevelt",
+  "\"The court is the last refuge of the oppressed.\" — Legal Maxim",
+];
+
+function ThinkingMessage() {
+  const [index, setIndex] = useState(() => Math.floor(Math.random() * THINKING_PHRASES.length));
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIndex((prev) => {
+        let next: number;
+        do { next = Math.floor(Math.random() * THINKING_PHRASES.length); } while (next === prev);
+        return next;
+      });
+    }, 2800);
+    return () => clearInterval(interval);
+  }, []);
+  return (
+    <span key={index} style={{ color: "rgba(201,168,76,0.6)", fontFamily: "var(--font-cormorant)", fontStyle: "italic", fontSize: "14px", animation: "fadeIn 0.5s ease both" }}>
+      {THINKING_PHRASES[index]}
+    </span>
+  );
+}
+
 export default function ResearchPage() {
   const { messages, isStreaming, sendMessage, stopStreaming, reset, restoreMessages } = useResearch();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -15,13 +87,28 @@ export default function ResearchPage() {
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messageElRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [historyRefresh, setHistoryRefresh] = useState(0);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [activeModel, setActiveModel] = useState("qwen2.5:7b");
+  const [activeModel, setActiveModel] = useState("qwen3:8b");
   const [modelOpen, setModelOpen] = useState(false);
   const prevStreamingRef = useRef(false);
   const isRestoredRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
+  const userScrolledUpRef = useRef(false);
+  const programmaticScrollRef = useRef(false);
+
+  // Track whether the user has scrolled away from the bottom.
+  // Ignore scroll events caused by our own programmatic scrollIntoView.
+  useEffect(() => {
+    const container = messagesScrollRef.current;
+    if (!container) return;
+    const onScroll = () => {
+      if (programmaticScrollRef.current) return;
+      const distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+      userScrolledUpRef.current = distFromBottom > 80;
+    };
+    container.addEventListener("scroll", onScroll, { passive: true });
+    return () => container.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
     fetch("/api/setup/select-model").then(r => r.json()).then(d => {
@@ -29,15 +116,19 @@ export default function ResearchPage() {
     }).catch(() => {});
   }, []);
 
-  useEffect(() => {
+  const scrollToBottom = useCallback(() => {
+    programmaticScrollRef.current = true;
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    // Clear the flag after the smooth scroll animation finishes
+    setTimeout(() => { programmaticScrollRef.current = false; }, 500);
+  }, []);
 
   useEffect(() => {
-    if (suggestions.length > 0) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!userScrolledUpRef.current) {
+      scrollToBottom();
     }
-  }, [suggestions]);
+  }, [messages, scrollToBottom]);
+
 
   const saveSession = useCallback(async (msgs: Message[]) => {
     if (msgs.length === 0) return;
@@ -79,20 +170,6 @@ export default function ResearchPage() {
       // Auto-save session after each response
       setTimeout(() => saveSession(messages), 100);
 
-      setSuggestions([]);
-      fetch("/api/attorney/research/suggestions", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userQuestion: lastUser.content,
-          assistantResponse: lastAssistant.content,
-          language: localStorage.getItem("mizan-locale") || "en",
-        }),
-      })
-        .then((r) => r.json())
-        .then((data) => { if (data.suggestions?.length) setSuggestions(data.suggestions); })
-        .catch(() => {});
     }
   }, [isStreaming, messages, saveSession]);
 
@@ -116,17 +193,13 @@ export default function ResearchPage() {
   function submit() {
     const val = inputRef.current?.value.trim();
     if (!val || isStreaming) return;
-    setSuggestions([]);
+
     isRestoredRef.current = false;
+    userScrolledUpRef.current = false;
     sendMessage(val);
     if (inputRef.current) { inputRef.current.value = ""; inputRef.current.style.height = "auto"; }
   }
 
-  function handleSuggestion(q: string) {
-    setSuggestions([]);
-    isRestoredRef.current = false;
-    sendMessage(q);
-  }
 
   async function handleManualSave() {
     if (messages.length === 0 || saveState === "saving") return;
@@ -148,7 +221,7 @@ export default function ResearchPage() {
     }
     isRestoredRef.current = false;
     sessionIdRef.current = null;
-    setSuggestions([]);
+
     reset();
     setHistoryRefresh((n) => n + 1);
   }
@@ -181,7 +254,7 @@ export default function ResearchPage() {
       }));
       isRestoredRef.current = true;
       sessionIdRef.current = sessionId ?? null;
-      setSuggestions([]);
+  
       restoreMessages(restored);
     }
   }
@@ -274,7 +347,7 @@ export default function ResearchPage() {
             {messages.map((msg, idx) => {
               const isLastAssistant = msg.role === "assistant" && idx === messages.length - 1;
               return (
-                <div key={msg.id} ref={(el) => { if (el) messageElRefs.current.set(msg.id, el); else messageElRefs.current.delete(msg.id); }}>
+                <div key={msg.id} ref={(el) => { if (el) messageElRefs.current.set(msg.id, el); else messageElRefs.current.delete(msg.id); }} style={{ animation: "contentReveal 0.4s ease both" }}>
                   <div className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
                     <div style={{ width: "30px", height: "30px", borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", background: msg.role === "user" ? "rgba(5,12,30,0.95)" : "rgba(8,18,35,0.9)", border: msg.role === "user" ? "1px solid rgba(22,62,158,0.44)" : "1px solid rgba(201,168,76,0.18)", color: msg.role === "user" ? "#3a62b8" : "#c9a84c", fontFamily: "var(--font-dm-sans)", fontWeight: 600 }}>
                       {msg.role === "user" ? "A" : "M"}
@@ -285,33 +358,12 @@ export default function ResearchPage() {
                           {msg.content}
                         </div>
                       ) : (
-                        <div className="research-md" style={{ borderLeft: "1.5px solid rgba(201,168,76,0.22)", paddingLeft: "16px", wordBreak: "break-word" }}>
+                        <div className={`research-md${isLastAssistant && isStreaming ? " streaming" : ""}`} style={{ borderLeft: "1.5px solid rgba(201,168,76,0.22)", paddingLeft: "16px", wordBreak: "break-word", animation: msg.role === "assistant" ? "contentReveal 0.45s ease both" : undefined }}>
                           {msg.content ? (
                             <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a> }}>{msg.content}</ReactMarkdown>
                           ) : (
-                            isStreaming ? <span style={{ color: "rgba(201,168,76,0.6)" }}>Researching…</span> : null
+                            isStreaming ? <ThinkingMessage /> : null
                           )}
-                        </div>
-                      )}
-                      {/* Follow-up suggestions after last assistant message */}
-                      {isLastAssistant && !isStreaming && suggestions.length > 0 && (
-                        <div style={{ marginTop: "14px", paddingLeft: "16px" }}>
-                          <p style={{ fontSize: "10px", letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(201,168,76,0.5)", fontFamily: "var(--font-dm-sans)", marginBottom: "8px" }}>
-                            Follow-up
-                          </p>
-                          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                            {suggestions.map((q, i) => (
-                              <button
-                                key={i}
-                                onClick={() => handleSuggestion(q)}
-                                style={{ textAlign: "left", padding: "8px 14px", borderRadius: "8px", background: "rgba(201,168,76,0.04)", border: "1px solid rgba(201,168,76,0.14)", color: "rgba(255,255,255,0.75)", fontSize: "12px", fontFamily: "var(--font-dm-sans)", cursor: "pointer", lineHeight: "1.5", transition: "all 0.15s" }}
-                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(201,168,76,0.35)"; e.currentTarget.style.color = "#ffffff"; e.currentTarget.style.background = "rgba(201,168,76,0.08)"; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(201,168,76,0.14)"; e.currentTarget.style.color = "rgba(255,255,255,0.75)"; e.currentTarget.style.background = "rgba(201,168,76,0.04)"; }}
-                              >
-                                {q}
-                              </button>
-                            ))}
-                          </div>
                         </div>
                       )}
                     </div>
@@ -393,9 +445,9 @@ export default function ResearchPage() {
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="1" y="2" width="8" height="6" rx="1" stroke="currentColor" strokeWidth="0.9" /><path d="M3 2V1.5A0.5 0.5 0 0 1 3.5 1h3a0.5 0.5 0 0 1 .5.5V2" stroke="currentColor" strokeWidth="0.9" /></svg>
                   {activeModel}
                   <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M2 3L4 5L6 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                  {activeModel === "qwen2.5:3b" && (
+                  {!["qwen3:8b", "qwen3:14b", "command-r"].includes(activeModel) && (
                     <span style={{ color: "rgba(201,168,76,0.4)", fontSize: "9px", marginLeft: "2px" }}>
-                      Switch to 7b for deeper analysis
+                      Switch to 8b+ for deeper analysis
                     </span>
                   )}
                 </button>
@@ -409,8 +461,11 @@ export default function ResearchPage() {
                       boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
                     }}>
                       {[
-                        { id: "qwen2.5:3b", label: "qwen2.5:3b", desc: "Fast · Light" },
-                        { id: "qwen2.5:7b", label: "qwen2.5:7b", desc: "Balanced" },
+                        { id: "qwen3:1.7b", label: "qwen3:1.7b", desc: "Quick · Simple" },
+                        { id: "qwen3:4b", label: "qwen3:4b", desc: "Fast · Light" },
+                        { id: "qwen3:8b", label: "qwen3:8b", desc: "Deep Reasoning" },
+                        { id: "qwen3:14b", label: "qwen3:14b", desc: "Pro · Fewer Hallucinations" },
+                        { id: "command-r", label: "command-r", desc: "RAG · Best Accuracy" },
                       ].map((m) => (
                         <button
                           key={m.id}
