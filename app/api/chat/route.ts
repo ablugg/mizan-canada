@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { retrieveContext } from "@/lib/rag";
+import { retrieveContext, verifyCitations } from "@/lib/rag";
 import { db } from "@/lib/db";
 import { chatStream, generateTitle, SYSTEM_PROMPT } from "@/lib/llm";
 import { encryptMessage, decryptMessage } from "@/lib/message-crypto";
@@ -162,6 +162,7 @@ export async function POST(req: NextRequest) {
 
   let fullResponse = "";
   let chunkCount = 0;
+  let inThinkBlock = false;
 
   const readableStream = new ReadableStream({
     async start(controller) {
@@ -169,10 +170,58 @@ export async function POST(req: NextRequest) {
       for await (const text of stream) {
         fullResponse += text;
         chunkCount++;
-        controller.enqueue(new TextEncoder().encode(text));
+
+        // Strip <think>...</think> blocks from Qwen3 responses
+        let filtered = text;
+        if (inThinkBlock) {
+          const closeIdx = filtered.indexOf("</think>");
+          if (closeIdx === -1) {
+            continue; // still inside think block, skip entire chunk
+          }
+          filtered = filtered.slice(closeIdx + 8);
+          inThinkBlock = false;
+        }
+        // Handle opening <think> tags (possibly multiple in one chunk)
+        while (filtered.includes("<think>")) {
+          const openIdx = filtered.indexOf("<think>");
+          const closeIdx = filtered.indexOf("</think>", openIdx);
+          if (closeIdx !== -1) {
+            filtered = filtered.slice(0, openIdx) + filtered.slice(closeIdx + 8);
+          } else {
+            filtered = filtered.slice(0, openIdx);
+            inThinkBlock = true;
+            break;
+          }
+        }
+
+        if (filtered) {
+          controller.enqueue(new TextEncoder().encode(filtered));
+        }
       }
 
+      // Strip think blocks from fullResponse for storage
+      fullResponse = fullResponse.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+
       console.log(`[chat] Stream complete -- ${chunkCount} chunks, ${fullResponse.length} chars`);
+
+      // Citation verification — append footer for unverified citations
+      if (context && fullResponse.length > 100) {
+        try {
+          const citations = await verifyCitations(fullResponse, context);
+          const unverified = citations.filter((c) => !c.verified);
+          if (unverified.length > 0) {
+            const footer = "\n\n---\n*Note: The following citations could not be verified against Mizan's legal database and may be inaccurate:* " +
+              unverified.map((c) => `**${c.citation}**`).join(", ");
+            controller.enqueue(new TextEncoder().encode(footer));
+            fullResponse += footer;
+            console.log(`[chat] ${unverified.length}/${citations.length} citations unverified`);
+          } else if (citations.length > 0) {
+            console.log(`[chat] All ${citations.length} citations verified`);
+          }
+        } catch (e) {
+          console.error("[chat] Citation verification failed:", e);
+        }
+      }
 
       if (validConversationId) {
         await db.message.create({

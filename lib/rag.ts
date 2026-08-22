@@ -223,7 +223,7 @@ export async function retrieveContext(
   console.log(`[rag] Hybrid search: ${keywordResults.length} keyword + ${baseResults.length + userResults.length} vector = ${limited.length} unique chunks`);
 
   return limited
-    .map((meta) => `[${meta.source} -- ${meta.jurisdiction}${meta.statute ? ` -- ${meta.statute}` : ""}]\n${meta.text}`)
+    .map((meta, i) => `[Source ${i + 1}] ${meta.source} | Jurisdiction: ${meta.jurisdiction}${meta.statute ? ` | Statute: ${meta.statute}` : ""}${meta.section ? ` | Type: ${meta.section}` : ""}\n${meta.text}`)
     .join("\n\n---\n\n");
 }
 
@@ -295,6 +295,67 @@ export async function addUserLaw(doc: {
   }
 
   return records.length;
+}
+
+/**
+ * Extract case citations from a response and verify them against the vector store.
+ * Returns a list of citations with their verification status.
+ */
+export async function verifyCitations(
+  response: string,
+  retrievedContext: string,
+  jurisdiction = "ca"
+): Promise<{ citation: string; verified: boolean }[]> {
+  // Extract "X v. Y" or "X v Y" patterns from the response
+  const casePattern = /([A-Z][\w''\-éèêëàâîïôùûü]+(?:\s+\([^)]*\))?)\s+v\.?\s+([A-Z][\w''\-éèêëàâîïôùûü]+(?:\s+\([^)]*\))?)/gi;
+  const citations: string[] = [];
+  let match;
+  while ((match = casePattern.exec(response)) !== null) {
+    citations.push(match[0].trim());
+  }
+
+  if (citations.length === 0) return [];
+
+  // Deduplicate
+  const unique = [...new Set(citations)];
+
+  // Check each citation against the retrieved context first (fast), then vector store
+  const contextLower = retrievedContext.toLowerCase();
+  const results: { citation: string; verified: boolean }[] = [];
+
+  const db = await getConnection(jurisdiction);
+  let table: Awaited<ReturnType<typeof db.openTable>> | null = null;
+  try {
+    table = await db.openTable(TABLE_NAME);
+  } catch {}
+
+  for (const cite of unique) {
+    // Check if it appears in the retrieved context
+    if (contextLower.includes(cite.toLowerCase())) {
+      results.push({ citation: cite, verified: true });
+      continue;
+    }
+
+    // Check vector store by keyword search on source field
+    if (table) {
+      try {
+        const party = cite.split(/\s+v\.?\s+/i)[0].trim().replace(/'/g, "''");
+        const matches = await table
+          .query()
+          .where(`source LIKE '%${party}%'`)
+          .select(["source"])
+          .limit(1)
+          .toArray();
+        results.push({ citation: cite, verified: matches.length > 0 });
+      } catch {
+        results.push({ citation: cite, verified: false });
+      }
+    } else {
+      results.push({ citation: cite, verified: false });
+    }
+  }
+
+  return results;
 }
 
 export async function deleteUserLawChunks(lawId: string): Promise<void> {

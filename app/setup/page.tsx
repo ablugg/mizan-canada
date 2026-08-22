@@ -42,9 +42,9 @@ interface ModelTier {
 const MODEL_TIERS: ModelTier[] = [
   { id: "qwen3:1.7b", name: "qwen3:1.7b", size: "~1.2 GB", ramNeeded: "4 GB", description: "Quickest responses — not for deep reasoning" },
   { id: "qwen3:4b", name: "qwen3:4b", size: "~2.6 GB", ramNeeded: "8 GB", description: "Fast, good for most tasks" },
-  { id: "qwen3:8b", name: "qwen3:8b", size: "~4.9 GB", ramNeeded: "16 GB", description: "Deep reasoning and accuracy" },
-  { id: "qwen3:14b", name: "qwen3:14b", size: "~9 GB", ramNeeded: "20 GB", description: "Pro — stronger reasoning, fewer hallucinations" },
-  { id: "command-r", name: "command-r", size: "~20 GB", ramNeeded: "36 GB", description: "RAG-optimized — best citation accuracy" },
+  { id: "qwen3:8b", name: "qwen3:8b", size: "~4.9 GB", ramNeeded: "16 GB", description: "Balanced — good reasoning and speed" },
+  { id: "qwen3:14b", name: "qwen3:14b", size: "~9 GB", ramNeeded: "20 GB", description: "Deep reasoning — fewer hallucinations" },
+  { id: "command-r", name: "command-r", size: "~20 GB", ramNeeded: "36 GB", description: "Best accuracy — built for grounded answers" },
 ];
 
 function recommendModel(hw: HardwareInfo): string {

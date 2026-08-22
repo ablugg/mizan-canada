@@ -328,10 +328,10 @@ export default function ResearchPage() {
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "center", marginTop: "24px" }}>
               {[
-                "What are the OSFI requirements for fintech licensing in Canada?",
-                "Analyse PIPEDA obligations for data processors",
-                "Compare federal and provincial arbitration procedures in Canada",
-                "Enforceability of non-compete clauses under Canadian employment law",
+                "What is the Oakes test and when does the government fail it?",
+                "Explain the presumptive ceilings under R v Jordan for s. 11(b) Charter rights",
+                "What are the sentencing principles under s. 718 of the Criminal Code?",
+                "Summarize Ontario's Highway Traffic Act provisions on careless driving",
               ].map((q) => (
                 <button key={q} onClick={() => sendMessage(q)} style={{ padding: "8px 14px", borderRadius: "20px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "#ffffff", fontSize: "11px", fontFamily: "var(--font-dm-sans)", cursor: "pointer", textAlign: "left", transition: "all 0.15s" }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(201,168,76,0.25)"; e.currentTarget.style.color = "rgba(201,168,76,0.85)"; }}
@@ -444,12 +444,13 @@ export default function ResearchPage() {
                 >
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="1" y="2" width="8" height="6" rx="1" stroke="currentColor" strokeWidth="0.9" /><path d="M3 2V1.5A0.5 0.5 0 0 1 3.5 1h3a0.5 0.5 0 0 1 .5.5V2" stroke="currentColor" strokeWidth="0.9" /></svg>
                   {activeModel}
+                  <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.45)", fontWeight: 600 }}>
+                    {({ "qwen3:1.7b": "Quick · Simple", "qwen3:4b": "Fast · Light", "qwen3:8b": "Balanced", "qwen3:14b": "Deep Reasoning", "command-r": "Best Accuracy" } as Record<string, string>)[activeModel] ?? ""}
+                  </span>
+                  <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>
+                    {({ "qwen3:1.7b": "4 GB", "qwen3:4b": "8 GB", "qwen3:8b": "16 GB", "qwen3:14b": "20 GB", "command-r": "36 GB" } as Record<string, string>)[activeModel] ?? ""}
+                  </span>
                   <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M2 3L4 5L6 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                  {!["qwen3:8b", "qwen3:14b", "command-r"].includes(activeModel) && (
-                    <span style={{ color: "rgba(201,168,76,0.4)", fontSize: "9px", marginLeft: "2px" }}>
-                      Switch to 8b+ for deeper analysis
-                    </span>
-                  )}
                 </button>
                 {modelOpen && (
                   <>
@@ -457,15 +458,15 @@ export default function ResearchPage() {
                     <div style={{
                       position: "absolute", bottom: "calc(100% + 4px)", left: 0, zIndex: 50,
                       background: "rgba(10,16,30,0.98)", border: "1px solid rgba(201,168,76,0.18)",
-                      borderRadius: "8px", padding: "4px", minWidth: "160px",
+                      borderRadius: "8px", padding: "4px", minWidth: "260px",
                       boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
                     }}>
                       {[
-                        { id: "qwen3:1.7b", label: "qwen3:1.7b", desc: "Quick · Simple" },
-                        { id: "qwen3:4b", label: "qwen3:4b", desc: "Fast · Light" },
-                        { id: "qwen3:8b", label: "qwen3:8b", desc: "Deep Reasoning" },
-                        { id: "qwen3:14b", label: "qwen3:14b", desc: "Pro · Fewer Hallucinations" },
-                        { id: "command-r", label: "command-r", desc: "RAG · Best Accuracy" },
+                        { id: "qwen3:1.7b", label: "qwen3:1.7b", desc: "Quick · Simple", hw: "4 GB RAM" },
+                        { id: "qwen3:4b", label: "qwen3:4b", desc: "Fast · Light", hw: "8 GB RAM" },
+                        { id: "qwen3:8b", label: "qwen3:8b", desc: "Balanced", hw: "16 GB RAM" },
+                        { id: "qwen3:14b", label: "qwen3:14b", desc: "Deep Reasoning", hw: "20 GB RAM" },
+                        { id: "command-r", label: "command-r", desc: "Best Accuracy", hw: "36 GB RAM" },
                       ].map((m) => (
                         <button
                           key={m.id}
@@ -483,8 +484,13 @@ export default function ResearchPage() {
                           <span style={{ fontSize: "11px", fontFamily: "var(--font-dm-sans)", color: activeModel === m.id ? "#c9a84c" : "rgba(220,228,242,0.8)" }}>
                             {m.label}
                           </span>
-                          <span style={{ fontSize: "9px", fontFamily: "var(--font-dm-sans)", color: "rgba(140,160,190,0.5)" }}>
-                            {m.desc}
+                          <span style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                            <span style={{ fontSize: "10px", fontFamily: "var(--font-dm-sans)", color: "rgba(255,255,255,0.7)" }}>
+                              {m.desc}
+                            </span>
+                            <span style={{ fontSize: "9px", fontFamily: "var(--font-dm-sans)", color: "rgba(255,255,255,0.4)" }}>
+                              {m.hw}
+                            </span>
                           </span>
                         </button>
                       ))}
